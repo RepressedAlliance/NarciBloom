@@ -139,6 +139,7 @@ collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='Nar
     notices = folder / 'licenses'
     notices.mkdir()
     shutil.copy2(ROOT / 'LICENSE', notices / 'NarciBloom-LICENSE.txt')
+    shutil.copy2(ROOT / 'LICENSE-APACHE-2.0.txt', notices / 'LICENSE-APACHE-2.0.txt')
     shutil.copy2(ROOT / 'THIRD_PARTY.md', notices / 'THIRD_PARTY.md')
     shutil.copy2(ROOT / '.deps/majiro-py/LICENSE', notices / 'majiro-py-LICENSE.txt')
     runtime_notices(notices)
