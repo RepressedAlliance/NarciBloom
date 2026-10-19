@@ -57,12 +57,16 @@ def _loader_literals(script):
             and i.fields['s'][0] >= 0x81]
 
 
-def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, replacements=None):
+def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, replacements=None,
+                             source_aliases=None):
     """Retain CP932 loader markers and append one translation per new ldstr.
 
     Only UI scripts without dialogue `text` opcodes are supported here. Story
     tables use a different stream of records and are never passed to this helper.
     `replacements` maps an original CP932 literal (decoded string) to new UI text.
+    `source_aliases` maps appended ldstr code offsets to their original offsets.
+    Cloned literals retain CP932 bytes and reuse the original table record; only
+    genuine new UI strings are decoded as GBK and replaced with CP932 markers.
     """
     original, prepared = Script(original_blob), Script(patched_blob)
     if any(i.name == 'text' for i in original.ins):
@@ -83,9 +87,42 @@ def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, re
         source = item.fields['s'].rstrip(b'\0').decode('cp932')
         if source in replacements:
             translated[index] = replacements[source]
+    records_by_offset = {item.offset: index for index, item in enumerate(originals)}
+    original_literals = {item.offset: item for item in original.ins if item.name == 'ldstr'}
+    originals_by_marker = {}
+    for item in original_literals.values():
+        originals_by_marker.setdefault(item.fields['s'], []).append(item)
+    aliases = {int(target): int(source) for target, source in (source_aliases or {}).items()}
+    used_aliases = set()
     added = []
+    reused = 0
     for item in prepared.ins:
-        if item.offset < len(original.code) or item.name != 'ldstr' or not any(c >= 128 for c in item.fields['s']):
+        if item.offset < len(original.code) or item.name != 'ldstr':
+            continue
+        raw = item.fields['s']
+        if item.offset in aliases:
+            source_offset = aliases[item.offset]
+            source = original_literals.get(source_offset)
+            if source is None or source.fields['s'] != raw:
+                raise ValueError('cloned translation alias does not match its original ldstr')
+            used_aliases.add(item.offset)
+            index = records_by_offset.get(source_offset)
+            if index is not None:
+                added.append(translated[index])
+                reused += 1
+            # ASCII-prefixed Japanese remains excluded by the native loader.
+            continue
+        if raw in originals_by_marker:
+            indices = [records_by_offset[source.offset] for source in originals_by_marker[raw]
+                       if source.offset in records_by_offset]
+            meanings = {translated[index] for index in indices}
+            if len(meanings) > 1:
+                raise ValueError('ambiguous cloned translation marker requires a source alias')
+            if meanings:
+                added.append(translated[indices[0]])
+                reused += 1
+            continue
+        if not any(c >= 128 for c in raw):
             continue
         added.append(item.fields['s'].rstrip(b'\0').decode('gbk'))
         size = len(item.fields['s'])
@@ -94,12 +131,15 @@ def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, re
             raise ValueError('new translation marker does not fit instruction')
         marker = marker.ljust(size - 1, b' ') + b'\0'
         prepared.code[item.offset + 4:item.offset + len(item.raw)] = marker
+    if used_aliases != set(aliases):
+        raise ValueError('translation source alias does not identify an appended ldstr')
     translated.extend(added)
     result = prepared.finish()
     if len(_loader_literals(Script(result))) != len(translated):
         raise ValueError('generated UI translation table is not aligned')
     return result, _encode_table(translated, encoding), {
         'encoding': encoding, 'existing_records': len(originals), 'added_records': len(added),
+        'reused_records': reused, 'new_ui_records': len(added) - reused,
     }
 
 
@@ -256,8 +296,11 @@ def build_chinese_payload(game, packed_exe_bytes, stock_files, font_family=None)
         if added_ui or (game == 'narci_onetwo' and name == 'pausemenu.mjo'):
             table_name = '#txt/' + name[:-4] + '.txt'
             replacements = {'フォント設定': '字体 / 字号'} if name == 'pausemenu.mjo' else None
+            aliases = (report.get('pagination', {}).get('translation_source_aliases')
+                       if name == 'console.mjo' else None)
             patched, table, table_report = prepare_menu_translation(
-                original, patched, payload.get(table_name), replacements=replacements)
+                original, patched, payload.get(table_name), replacements=replacements,
+                source_aliases=aliases)
             overrides[name] = patched
             payload[table_name] = table
             table_reports[name] = table_report

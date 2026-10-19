@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import chinese_builder as chinese
-from build_font_settings import Builder, Script
+from build_font_settings import Builder, Script, emit
 from patch_narcissu_font import archive, entries
 
 
@@ -24,6 +24,22 @@ def add_menu(original):
     script = Script(original)
     script.add(456, Builder('gbk').text('返回').op('pop').text('字号：').op('pop').ret().finish())
     return script.finish()
+
+
+def clone_literals(original, source_offsets, *, patched=None):
+    source = Script(original)
+    result = Script(patched or original)
+    literals = {item.offset: item for item in source.ins if item.name == 'ldstr'}
+    start = len(result.code)
+    body = bytearray()
+    aliases = {}
+    for offset in source_offsets:
+        aliases[start + len(body)] = offset
+        body.extend(literals[offset].raw)
+        body.extend(emit('pop'))
+    body.extend(Builder().ret().finish())
+    result.add(789, bytes(body))
+    return result.finish(), aliases
 
 
 class ChineseBuilderTests(unittest.TestCase):
@@ -72,6 +88,60 @@ class ChineseBuilderTests(unittest.TestCase):
         self.assertEqual(len(chinese._loader_literals(Script(result))), 4)
         self.assertEqual(Script(result).code[:len(Script(original).code)], Script(original).code)
 
+    def test_clones_reuse_original_cp932_translation_and_skip_ascii_prefixes(self):
+        original = ui_script('戻る', ' / 音量 : ', '戻る')
+        literals = [item for item in Script(original).ins if item.name == 'ldstr']
+        patched, aliases = clone_literals(original, [item.offset for item in literals])
+        table = '原返回\r\n原返回\r\n'.encode('utf-16')
+        result, translated, report = chinese.prepare_menu_translation(
+            original, patched, table, source_aliases=aliases)
+        self.assertEqual(translated.decode('utf-16').splitlines(), ['原返回'] * 4)
+        self.assertEqual(report['existing_records'], 2)
+        self.assertEqual(report['reused_records'], 2)
+        self.assertEqual(report['new_ui_records'], 0)
+        self.assertEqual(Script(result).code, Script(patched).code)
+
+    def test_identical_marker_reuse_keeps_original_table_order_and_repeated_rows(self):
+        original = ui_script('戻る', '設定', '戻る')
+        first = next(item for item in Script(original).ins if item.name == 'ldstr')
+        patched, _ = clone_literals(original, [first.offset, first.offset])
+        result, translated, report = chinese.prepare_menu_translation(
+            original, patched, '返回\r\n配置\r\n返回\r\n'.encode('utf-16'))
+        self.assertEqual(translated.decode('utf-16').splitlines(), ['返回', '配置', '返回', '返回', '返回'])
+        self.assertEqual(Script(result).code, Script(patched).code)
+        self.assertEqual(report['reused_records'], 2)
+
+    def test_ambiguous_marker_requires_alias_and_uses_the_exact_source_row(self):
+        original = ui_script('戻る', '戻る')
+        source = [item for item in Script(original).ins if item.name == 'ldstr']
+        patched, aliases = clone_literals(original, [source[1].offset])
+        table = '第一译文\r\n第二译文\r\n'.encode('utf-16')
+        with self.assertRaisesRegex(ValueError, 'ambiguous'):
+            chinese.prepare_menu_translation(original, patched, table)
+        result, translated, _ = chinese.prepare_menu_translation(
+            original, patched, table, source_aliases=aliases)
+        self.assertEqual(translated.decode('utf-16').splitlines(), ['第一译文', '第二译文', '第二译文'])
+        self.assertEqual(Script(result).code, Script(patched).code)
+
+    def test_new_gbk_ui_and_cp932_clone_are_distinguished_in_one_script(self):
+        original = ui_script('戻る')
+        source = next(item for item in Script(original).ins if item.name == 'ldstr')
+        patched, aliases = clone_literals(original, [source.offset], patched=add_menu(original))
+        _, translated, report = chinese.prepare_menu_translation(
+            original, patched, '原返回\r\n'.encode('utf-16'), source_aliases=aliases)
+        self.assertEqual(translated.decode('utf-16').splitlines(), ['原返回', '返回', '字号：', '原返回'])
+        self.assertEqual(report['new_ui_records'], 2)
+        self.assertEqual(report['reused_records'], 1)
+
+    def test_invalid_clone_aliases_are_rejected(self):
+        original = ui_script('戻る', '設定')
+        source = [item for item in Script(original).ins if item.name == 'ldstr']
+        patched, aliases = clone_literals(original, [source[0].offset])
+        target = next(iter(aliases))
+        for invalid in ({target: source[1].offset}, {target + 100: source[0].offset}):
+            with self.subTest(aliases=invalid), self.assertRaisesRegex(ValueError, 'alias'):
+                chinese.prepare_menu_translation(original, patched, source_aliases=invalid)
+
     def test_rejects_mismatched_ui_table_and_story_text(self):
         original = ui_script('設定')
         with self.assertRaisesRegex(ValueError, 'count'):
@@ -111,6 +181,27 @@ class ChineseBuilderTests(unittest.TestCase):
         for name in overrides:
             self.assertEqual(result.payload['#mjo/' + name], generated[name][2])
         self.assertEqual(result.payload['#txt/config.txt'].decode('utf-16').splitlines(), ['菜单', '返回', '字号：'])
+
+    def test_payload_consumes_pagination_source_alias_metadata(self):
+        original = ui_script('戻る', '戻る')
+        source = [item for item in Script(original).ins if item.name == 'ldstr']
+        patched, aliases = clone_literals(original, [source[1].offset])
+        virtual = {'#mjo/console.mjo': original,
+                   '#txt/console.txt': '第一译文\r\n第二译文\r\n'.encode('utf-16'),
+                   'Narcissu_cn.dll': b'dll'}
+        stock = {name: original for name in ('config.mjo', 'console.mjo', 'load_sysdata.mjo')}
+        overrides = dict(stock, **{'console.mjo': patched})
+        report = {'pagination': {'translation_source_aliases': aliases}}
+        with patch.object(chinese, 'extract_virtual_files', return_value=virtual), \
+             patch.object(chinese, 'restore_virtual_pe', return_value=b'PE'), \
+             patch.object(chinese, 'native_dialogs', return_value=(b'PE', {})), \
+             patch.object(chinese, '_caption_assignment', return_value=b'patched dll'), \
+             patch.object(chinese, 'build_overrides', return_value=(overrides, report, {}, {})):
+            result = chinese.build_chinese_payload('narci_iris', b'packed', stock)
+        self.assertEqual(result.payload['#mjo/console.mjo'], patched)
+        self.assertEqual(result.payload['#txt/console.txt'].decode('utf-16').splitlines(),
+                         ['第一译文', '第二译文', '第二译文'])
+        self.assertEqual(result.report['ui_translation_tables']['console.mjo']['reused_records'], 1)
 
     def test_caption_skip_preserves_operand_relocations_and_forwarding(self):
         data = b'prefix' + bytes.fromhex('c74510484203105dff254cb10310') + b'trailer'
