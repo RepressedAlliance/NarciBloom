@@ -1,0 +1,17 @@
+/.deps/
+/work/
+/build/
+/dist/
+/.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.local
+*.arc
+*.mjo
+*.exe
+*.dll
+*.sav
+*.dat
+*.pem
+*.key

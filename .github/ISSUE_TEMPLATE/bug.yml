@@ -1,0 +1,23 @@
+name: 字号或显示问题
+description: 报告文字、换行或界面异常
+body:
+  - type: input
+    id: version
+    attributes:
+      label: NarciBloom 版本或提交
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 游戏、汉化与运行环境
+      description: 请写明汉化版本、设备、系统及 Proton 版本，不要提供密码或连接信息。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 场景、字号与表现
+      description: 请尽量不剧透；可附截图，不要上传完整游戏文件或个人存档。
+    validations:
+      required: true
