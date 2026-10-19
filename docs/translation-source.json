@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-20",
+  "id": "furin-narcissu-10th-pc-1.1",
+  "display_name": "风铃汉化组《水仙十周年纪念版》PC 汉化 v1.1",
+  "translation_group": "风铃汉化组",
+  "version": "1.1",
+  "released_on": "2025-10-31",
+  "game": {
+    "title": "Narcissu 10th Anniversary Anthology Project",
+    "steam_app_id": "426690",
+    "base_game_included": false
+  },
+  "source": {
+    "page_url": "https://www.rainlain.com/index.php/2024/11/01/2567/",
+    "page_title": "〖风铃汉化组〗水仙十周年纪念版汉化发布（25.10.31更新）",
+    "site_name": "梦雨玲音",
+    "page_published_on": "2024-11-01",
+    "download_section": "三、下载和使用 / 游戏补丁（ver1.1）",
+    "publisher_identity_basis": "发布页由自称风铃汉化组组长的 huoyanyan 开篇；网站标示为汉化组官方发布帖；包内说明署名该组并指向此域名。",
+    "independent_reference": {
+      "url": "https://steamcommunity.com/id/YukiwaEka/recommended/426690",
+      "author_display_name": "ey",
+      "published_on": "2025-07-15",
+      "updated_on": "2025-07-29",
+      "scope": "玩家评测感谢风铃汉化组并将 rainlain.com 列为原发布站；早于 v1.1，不提供额外许可。"
+    }
+  },
+  "notice": {
+    "license_identifier": null,
+    "basis": ["发布页第四节转载声明", "原包 readme.txt 第三节转载声明"],
+    "redistribution_welcomed": true,
+    "preserve_translation_information": true,
+    "opposes_profit_from_translation": true,
+    "listed_restrictions": ["付费下载", "回帖可见", "支付虚拟币"],
+    "explicit_installation_permission": "允许为启动器兼容而重命名补丁 EXE、覆盖原程序。",
+    "modified_redistribution_permission": "not_explicitly_stated",
+    "game_redistribution_permission": "not_granted_by_this_notice",
+    "bundle_permission": "interpreted_from_general_redistribution_notice_not_separately_confirmed",
+    "planned_distribution": "unchanged_original_archive_with_separate_tool_local_generation",
+    "ship_pre_modified_translation_executables": false,
+    "ship_extracted_translation_resources": false,
+    "requires_separate_game_installation": true,
+    "legal_safety_guarantee": false
+  },
+  "attribution": {
+    "installer_summary": "汉化：风铃汉化组；字体功能及平台适配：NarciBloom。汉化 v1.1（2025-10-31），原发布页：https://www.rainlain.com/index.php/2024/11/01/2567/",
+    "preserve_original_readme": true,
+    "credits_basis": "原包 readme.txt；官网校对名单另补 INOUE心葉。保留原列名及顺序，包含原文重复项。",
+    "credits": {
+      "统筹": ["huoyanyan", "镜月☆萌虎"],
+      "翻译": ["master", "素晴Kw", "所以说", "雨のmusique", "yukina ibara", "Master chef", "素晴Kw", "梦特"],
+      "校对": ["孤狼", "呪い", "alsrf", "yukina ibara", "huoyanyan", "SweeTnT", "梦特", "云彩之塔塔主", "托托巴斯", "INOUE心葉"],
+      "后期": ["1000th", "stay cool", "嘎嘎嘎068", "七夜志贵"],
+      "润色": ["huoyanyan", "梦特", "嘎嘎嘎068", "托托巴斯"],
+      "程序": ["天殇", "镜月☆萌虎"],
+      "美工": ["心神不宁"],
+      "测试": ["y酱", "Setsumi22", "flunk", "selenar", "yoko4ever"]
+    }
+  },
+  "input_fingerprint": {
+    "status": "locally_observed_sample",
+    "publisher_published_hash": null,
+    "publisher_signature_verified": false,
+    "independent_redownload_compared": false,
+    "recognition_is_not_authenticity_or_safety_verification": true,
+    "archive": {
+      "filename": "N10 ver1.1补丁.rar",
+      "size_bytes": 81014080,
+      "sha256": "20c18c518f001249867fe8903344b3eff456ed342115ac0d6d1d8db3e7b9d735"
+    },
+    "members": [
+      {"path": "narci_iris/narci_iris_cn.exe", "size_bytes": 12881920, "sha256": "76447fab6c3987ee8c78058f64b57a736fcb17b91860cb8f155dce8a87eaef87"},
+      {"path": "narci_zero/narci_zero_cn_.exe", "size_bytes": 16777216, "sha256": "fc5c1b463b28e2dcdc30f6a961a3c554246d390c48396c1e417649c87cce0fbf"},
+      {"path": "narci_sumire/narci_sumire_cn.exe", "size_bytes": 79691776, "sha256": "c62e87c4a2f6eaa30f2cd382858c241953cb59eef74db71250dc8778d6d63581"},
+      {"path": "narci_himeko/Narci_himeko_cn.exe", "size_bytes": 15884288, "sha256": "04dafe9837fd1b47eeb950b812b4699ff46eb2e11f96ff034a18c1e27eab2a5e"},
+      {"path": "narci_onetwo/narci_onetwo_cn.exe", "size_bytes": 10673152, "sha256": "daf4201820ecb89b1d09008b303a8e8e35a79ccb136abbd606438e11bd3052e6"},
+      {"path": "readme.txt", "size_bytes": 2574, "sha256": "7c1e7b6877532c0c8310a82050addb6f5400945cf066900a0123779be633f9dd"}
+    ],
+    "prior_onetwo_input_sha256": "c87ae1cbcfd35d10fbc93113167cbb4feab0507189f646c454573b873b8b56ce",
+    "prior_onetwo_input_matches": false,
+    "adaptation_validation": "not_established_by_this_metadata"
+  }
+}
