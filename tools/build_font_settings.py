@@ -382,7 +382,16 @@ def build_overrides(game, files, language='zh-CN', font_family=None):
         config,hooks,new_functions,hashes=patch_config(files[setting_script],language)
     loader,load_hooks=patch_loader(files['load_sysdata.mjo'])
     console,rects=patch_console_bounded(files['console.mjo'])
+    from layout_candidate import patch_console_pagination,patch_sensitive_menu_entry,CONFIG_MENU,HISTORY,PAUSE_MENU
+    console,pagination=patch_console_pagination(console)
     override.update({setting_script:config,'load_sysdata.mjo':loader,'console.mjo':console})
+    menu_guards={}
+    for name,target in [('config.mjo',CONFIG_MENU),('history.mjo',HISTORY)]:
+        if name in files:
+            override[name],menu_guards[name]=patch_sensitive_menu_entry(override.get(name,files[name]),target)
+    if game=='narci_onetwo':
+        override[setting_script],menu_guards[setting_script]=patch_sensitive_menu_entry(override[setting_script],PAUSE_MENU)
+    pagination['menu_entry_guards']=menu_guards
     # 1+2 virtual files are handled by the separate repair recipe.
     renames=[]
     report={'game':game,
@@ -390,6 +399,7 @@ def build_overrides(game, files, language='zh-CN', font_family=None):
             'font_family_override':font_family,
             'override_files':list(override),'config_hooks':hooks,'loader_hooks':load_hooks,
             'text_rectangles':rects,'embedded_directory_renames':renames,
+            'pagination':pagination,
             'font_sizes':SIZES,'default_font_size':DEFAULT,'ui_functions':hashes,
             'settings_script':setting_script,
             'archive_bytes':len(archive(override))}
