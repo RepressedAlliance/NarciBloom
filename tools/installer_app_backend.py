@@ -185,8 +185,8 @@ def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
     if needs_archive:
         translation_archive = translation_archive or record['metadata'].get('translation_archive')
         if not translation_archive:
-            raise InstallError('Select the original PC v1.1 translation RAR package')
-        progress('Checking the original translation package…')
+            raise InstallError('Select the prepared PC v1.1 translation ZIP or original RAR package')
+        progress('Checking the PC v1.1 translation input…')
         package = read_package(translation_archive, chosen)
     payload, stories = {}, {}
     for module in chosen:

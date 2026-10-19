@@ -167,12 +167,17 @@ class ChineseBuilderTests(unittest.TestCase):
         patched = add_menu(original)
         overrides = {'config.mjo': patched, 'console.mjo': original, 'load_sysdata.mjo': original}
         stock = {'config.mjo': original, 'console.mjo': original, 'load_sysdata.mjo': original}
-        with patch.object(chinese, 'extract_virtual_files', return_value=virtual), \
-             patch.object(chinese, 'restore_virtual_pe', return_value=b'PE'), \
+        with patch.object(chinese, 'extract_virtual_files', return_value=virtual) as extraction, \
+             patch.object(chinese, 'restore_virtual_pe', return_value=b'PE') as restoration, \
              patch.object(chinese, 'native_dialogs', return_value=(b'PE', {})), \
              patch.object(chinese, '_caption_assignment', return_value=b'patched dll'), \
-             patch.object(chinese, 'build_overrides', return_value=(overrides, {}, {}, {})):
+             patch.object(chinese, 'build_overrides', side_effect=lambda *args: (dict(overrides), {}, {}, {})):
             result = chinese.build_chinese_payload('narci_iris', b'packed', stock)
+            prepared = chinese.PreparedTranslation('narci_iris', b'PE', virtual)
+            same = chinese.build_chinese_payload('narci_iris', prepared, stock)
+        self.assertEqual(same, result)
+        extraction.assert_called_once_with(b'packed')
+        restoration.assert_called_once_with(b'packed')
         self.assertIsInstance(result, chinese.ChineseBuild)
         self.assertEqual(result.executable, b'PE')
         self.assertEqual(result.payload['update.arc'], virtual['update.arc'])
@@ -181,6 +186,12 @@ class ChineseBuilderTests(unittest.TestCase):
         for name in overrides:
             self.assertEqual(result.payload['#mjo/' + name], generated[name][2])
         self.assertEqual(result.payload['#txt/config.txt'].decode('utf-16').splitlines(), ['菜单', '返回', '字号：'])
+
+    def test_prepared_module_mismatch_fails_before_building(self):
+        prepared = chinese.PreparedTranslation('narci_zero', b'PE', {})
+        with patch.object(chinese, 'build_overrides', side_effect=AssertionError('No build')):
+            with self.assertRaisesRegex(ValueError, 'different module'):
+                chinese.build_chinese_payload('narci_iris', prepared, {})
 
     def test_payload_consumes_pagination_source_alias_metadata(self):
         original = ui_script('戻る', '戻る')

@@ -14,6 +14,7 @@ import webbrowser
 
 SOURCE_URL = "https://www.rainlain.com/index.php/2024/11/01/2567/"
 ARCHIVE_NAME = "N10 ver1.1补丁.rar"
+PREPARED_ARCHIVE_NAME = "NarciBloom-translation-PC-v1.1-prepared.zip"
 LANGUAGES = {"日本語": "ja", "English": "en", "简体中文": "zh"}
 TEXT = {
     "zh": {
@@ -23,20 +24,20 @@ TEXT = {
         "all": "全选", "none": "全不选", "empty": "找到游戏后，将显示实际已安装的故事。",
         "unknown": "未识别版本，暂不支持", "ja": "日文", "en": "英文", "zh-CN": "简体中文",
         "unrecognized": "语言未识别", "version": "当前补丁：{version}", "not_installed": "尚未安装 NarciBloom",
-        "font": "默认字体（可选）", "keep_font": "留空自动选择已装字体", "archive": "原汉化 PC v1.1 RAR",
-        "archive_browse": "选择 RAR…", "source": "汉化原发布页", "install": "安装 / 更新", "uninstall": "卸载并恢复",
+        "font": "默认字体（可选）", "keep_font": "留空自动选择已装字体", "archive": "汉化输入（ZIP / RAR）",
+        "archive_browse": "选择材料…", "source": "汉化原发布页", "install": "安装 / 更新", "uninstall": "卸载并恢复",
         "copy": "复制日志", "working": "正在处理，请稍候…", "searching": "正在查找 Steam 并检查游戏…",
         "ready": "已检查目录。请选择故事，然后安装。", "no_game": "没有自动找到游戏，请选择 Steam 十周年合集目录。",
         "no_story": "没有找到可安装的故事。请检查目录与游戏文件；不支持的版本已在上方标出。",
         "close_busy": "任务正在进行，请等待完成后再关闭窗口。", "busy_title": "任务进行中",
         "error_title": "未完成", "error": "操作未完成；详细原因已保留在日志中。", "copied": "日志已复制。",
         "installed": "安装完成。请返回 Steam 启动游戏。", "uninstalled": "卸载完成，已恢复原文件并保留存档。",
-        "need_archive": "请先选择原汉化 PC v1.1 RAR；整合包内的同名原包可自动使用。",
+        "need_archive": "请选择随包预处理 ZIP 或原版 PC v1.1 RAR；随包 ZIP 可自动识别。",
         "backend_missing": "安装组件未能加载，请重新解压完整安装包；详细原因见日志。",
         "backend_dev": "开发环境未能加载 installer_app_backend；请检查依赖与日志。",
         "font_scope": "只处理已安装、已识别且勾选的故事；保留当前剧情语言，不下载游戏或 DLC。",
         "chinese_scope": "原汉化 PC v1.1 ＋可调字号；仅处理已安装且支持的故事，需要自有 Steam 游戏。",
-        "choose_game": "选择十周年合集游戏根目录", "choose_archive": "选择原汉化 PC v1.1 RAR",
+        "choose_game": "选择十周年合集游戏根目录", "choose_archive": "选择 PC v1.1 汉化输入材料",
         "log": "进度与日志", "path_changed": "目录已变更，请先检查目录。",
         "recovery": "检测到未完成的操作；安装或卸载会先恢复，发现后续文件变化时会停止。",
     },
@@ -47,20 +48,20 @@ TEXT = {
         "stories": "Choose stories", "all": "Select all", "none": "Clear", "empty": "Installed stories will appear after checking the game folder.",
         "unknown": "Unrecognized version; unsupported", "ja": "Japanese", "en": "English", "zh-CN": "Simplified Chinese",
         "unrecognized": "Language unrecognized", "version": "Installed patch: {version}", "not_installed": "NarciBloom is not installed",
-        "font": "Default font (optional)", "keep_font": "Blank: select a local font", "archive": "Original PC v1.1 translation RAR",
-        "archive_browse": "Choose RAR…", "source": "Original translation release", "install": "Install / Update", "uninstall": "Uninstall & Restore",
+        "font": "Default font (optional)", "keep_font": "Blank: select a local font", "archive": "Translation input (ZIP / RAR)",
+        "archive_browse": "Choose input…", "source": "Original translation release", "install": "Install / Update", "uninstall": "Uninstall & Restore",
         "copy": "Copy log", "working": "Working, please wait…", "searching": "Finding Steam and checking game files…",
         "ready": "Folder checked. Choose stories, then install.", "no_game": "No game found automatically. Select the Steam anthology folder.",
         "no_story": "No supported installed stories found. Check the folder and game files; unsupported versions are listed above.",
         "close_busy": "An operation is running. Please wait for it to finish before closing.", "busy_title": "Operation running",
         "error_title": "Not completed", "error": "The operation was not completed. The log contains the reason.", "copied": "Log copied.",
         "installed": "Installation complete. Launch the game through Steam.", "uninstalled": "Uninstall complete. Original files restored; saves retained.",
-        "need_archive": "Choose the original PC v1.1 translation RAR. The bundle's accompanying archive is detected automatically.",
+        "need_archive": "Choose the prepared ZIP or original PC v1.1 RAR. The accompanying prepared ZIP is detected automatically.",
         "backend_missing": "Installation components could not load. Extract the complete package again; see the log for details.",
         "backend_dev": "Cannot load installer_app_backend in this development environment. Check dependencies and the log.",
         "font_scope": "Only selected, recognized, installed stories are changed. Story language is retained; no game or DLC downloads.",
         "chinese_scope": "PC v1.1 Chinese translation + adjustable font size. Only supported installed stories; requires your Steam game.",
-        "choose_game": "Select the anthology's game root folder", "choose_archive": "Choose the original PC v1.1 translation RAR",
+        "choose_game": "Select the anthology's game root folder", "choose_archive": "Choose the PC v1.1 translation input",
         "log": "Progress and log", "path_changed": "Folder changed. Check the folder before installing.",
         "recovery": "An interrupted operation needs recovery. Install or Uninstall will recover first, stopping if files changed afterwards.",
     },
@@ -71,20 +72,20 @@ TEXT = {
         "all": "すべて選択", "none": "選択解除", "empty": "ゲームを確認すると、インストール済みの作品が表示されます。",
         "unknown": "未認識のバージョン・未対応", "ja": "日本語", "en": "英語", "zh-CN": "簡体字中国語",
         "unrecognized": "言語未認識", "version": "導入済みパッチ：{version}", "not_installed": "NarciBloom は未導入です",
-        "font": "標準フォント（任意）", "keep_font": "空欄：既存フォントを自動選択", "archive": "中国語訳 PC v1.1 の原本 RAR",
-        "archive_browse": "RAR を選択…", "source": "中国語訳の公式配布ページ", "install": "インストール / 更新", "uninstall": "削除して元に戻す",
+        "font": "標準フォント（任意）", "keep_font": "空欄：既存フォントを自動選択", "archive": "中国語訳の入力（ZIP / RAR）",
+        "archive_browse": "入力を選択…", "source": "中国語訳の公式配布ページ", "install": "インストール / 更新", "uninstall": "削除して元に戻す",
         "copy": "ログをコピー", "working": "処理中です。しばらくお待ちください…", "searching": "Steam を検索し、ゲームを確認中…",
         "ready": "確認しました。作品を選択してインストールしてください。", "no_game": "自動検出できませんでした。Steam 十周年合集のフォルダーを選択してください。",
         "no_story": "対応する作品が見つかりません。フォルダーとゲームファイルを確認してください。未対応の版は上に表示されます。",
         "close_busy": "処理中です。完了してからウィンドウを閉じてください。", "busy_title": "処理中",
         "error_title": "完了できませんでした", "error": "処理は完了していません。詳しい理由はログをご確認ください。", "copied": "ログをコピーしました。",
         "installed": "インストール完了。Steam からゲームを起動してください。", "uninstalled": "削除完了。元のファイルに復元し、セーブは保持しました。",
-        "need_archive": "中国語訳 PC v1.1 の原本 RAR を選択してください。同梱された原本は自動検出されます。",
+        "need_archive": "同梱の前処理 ZIP または PC v1.1 原本 RAR を選択してください。同梱 ZIP は自動検出されます。",
         "backend_missing": "インストール部品を読み込めません。パッケージ全体を再展開し、ログを確認してください。",
         "backend_dev": "開発環境で installer_app_backend を読み込めません。依存関係とログを確認してください。",
         "font_scope": "選択した導入済み・認識済みの作品のみ変更します。本文の言語を保持し、ゲームや DLC はダウンロードしません。",
         "chinese_scope": "中国語訳 PC v1.1 ＋文字サイズ設定。対応する導入済み作品のみ対象。自分の Steam ゲームが必要です。",
-        "choose_game": "十周年合集のゲームルートを選択", "choose_archive": "中国語訳 PC v1.1 の原本 RAR を選択",
+        "choose_game": "十周年合集のゲームルートを選択", "choose_archive": "PC v1.1 中国語訳の入力を選択",
         "log": "進捗とログ", "path_changed": "フォルダーが変更されました。先に確認してください。",
         "recovery": "未完了の処理があります。導入・削除の前に復元し、後からファイルが変わっていれば停止します。",
     },
@@ -112,6 +113,9 @@ def default_mode():
 
 
 def companion_archive(directory: Path) -> Path | None:
+    prepared = directory / PREPARED_ARCHIVE_NAME
+    if prepared.is_file():
+        return prepared
     exact = directory / ARCHIVE_NAME
     if exact.is_file():
         return exact
@@ -384,7 +388,9 @@ class InstallerApp:
     def choose_archive(self):
         from tkinter import filedialog
         archive = filedialog.askopenfilename(parent=self.root, title=self.t("choose_archive"),
-                                              filetypes=[("RAR", "*.rar"), ("All files", "*")])
+                                              filetypes=[("Prepared ZIP / Original RAR", ("*.zip", "*.rar")),
+                                                         ("Prepared ZIP", "*.zip"), ("Original RAR", "*.rar"),
+                                                         ("All files", "*")])
         if archive:
             self.archive.set(archive)
 

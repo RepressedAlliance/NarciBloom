@@ -14,7 +14,7 @@ Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology P
 | Package | Purpose |
 |---|---|
 | **Fonts** | Keep the story language of a recognized Japanese, English or supported Simplified Chinese installation and add font controls. |
-| **Chinese** | Include 风铃汉化组's unchanged PC v1.1 RAR and the same font core. The installer generates the adapted files locally from that archive and your own Steam game. |
+| **Chinese** | Include transparently prepared PC v1.1 translation inputs, original credits and the same font core. Original virtual resources are retained; virtualized engines are restored. Font and layout adaptations are generated locally using your own Steam game. |
 
 Only the recorded Steam anthology versions and PC v1.1 Chinese translation are recognized. Other editions, translation builds and the separate free *Narcissu 1st & 2nd* release are outside this scope. The installer lists stories actually installed on your machine; it does not download the game or DLC.
 
@@ -24,7 +24,7 @@ Translation: **风铃汉化组**. Font features and platform adaptation: **Narci
 
 Close the game, extract the complete package, then open its native launcher: `NarciBloom.exe` / `NarciBloomChinese.exe` on Windows, or `NarciBloom` / `NarciBloomChinese` in SteamOS desktop mode. The SteamOS installer runs natively; the game continues to launch through Steam with its configured compatibility layer.
 
-Check the anthology's game root folder, select the supported stories you own, and choose **Install / Update**. The Chinese launcher detects its accompanying original RAR, or lets you select it. **Uninstall & Restore** uses the originals retained in the game's `.narcibloom` folder; keep that folder. Later changes by Steam or another mod are reported as conflicts instead of silently overwritten. Personal saves are protected. See the [installation and recovery guide](docs/INSTALLATION.md).
+Check the anthology's game root folder, select the supported stories you own, and choose **Install / Update**. The Chinese launcher detects its accompanying prepared ZIP; the recognized original RAR is also accepted. **Uninstall & Restore** uses the originals retained in the game's `.narcibloom` folder; keep that folder. Later changes by Steam or another mod are reported as conflicts instead of silently overwritten. Personal saves are protected. See the [installation and recovery guide](docs/INSTALLATION.md).
 
 In 1+2, open the pause menu → Options → Font / Size. The other stories add size buttons to their existing settings page. Image-based labels do not scale with story text.
 

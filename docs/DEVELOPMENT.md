@@ -25,9 +25,9 @@ python tools/app.py
 python tools/app.py --mode chinese --language zh
 ```
 
-可用 `--game-dir ./work/my-anthology` 预填游戏根目录。界面支持 `ja`、`en`、`zh`；界面语言不改变剧情语言。字体模式保留识别到的日文／英文／受支持中文输入，中文模式读取玩家提供的风铃汉化组 PC v1.1 原始 RAR，再用同一字体核心在本地生成适配文件。源码 GUI 的中文模式通过「选择 RAR」指定原包；分发包可自动发现启动程序旁的同名原包。
+可用 `--game-dir ./work/my-anthology` 预填游戏根目录。界面支持 `ja`、`en`、`zh`；界面语言不改变剧情语言。字体模式保留识别到的日文／英文／受支持中文输入，中文模式读取受支持的 PC v1.1 透明安装材料 ZIP 或原始 RAR，再用同一字体核心在本地生成适配文件。分发包优先自动发现启动程序旁的 `NarciBloom-translation-PC-v1.1-prepared.zip`，其次识别原 RAR。
 
-Windows RAR 读取使用系统 `tar.exe`；Linux／SteamOS 使用系统 `libarchive`。Linux 图形会话还须能运行 Tk，并具备相容的图形和字体运行库。字体自动选择会查询 Windows 字体注册表或 `fc-list`，也可手动指定本机已有字体；安装器不安装字体、不更改系统区域。
+透明安装材料使用标准 ZIP 读取，不需要 RAR 工具。读取原 RAR 时，Windows 使用系统 `tar.exe`，Linux／SteamOS 使用系统 `libarchive`。Linux 图形会话还须能运行 Tk，并具备相容的图形和字体运行库。字体自动选择会查询 Windows 字体注册表或 `fc-list`，也可手动指定本机已有字体；安装器不安装字体、不更改系统区域。
 
 Windows 和 SteamOS 使用各自的原生入口。SteamOS 安装器在桌面模式运行，安装完成后仍通过 Steam 原入口启动游戏；安装器不需要放进 Proton 前缀。实际安装、冲突与恢复操作见 [INSTALLATION.md](INSTALLATION.md)。
 
@@ -48,7 +48,7 @@ Windows 和 SteamOS 使用各自的原生入口。SteamOS 安装器在桌面模�
 
 `chinese_builder.build_chinese_payload(game, packed_exe_bytes, stock_files, font_family)` 返回 `ChineseBuild(payload, executable, report)`。它在内存中读取原汉化的虚拟文件并恢复 PE，合并原版资源、汉化 ARC 和优先的 `#mjo/` 脚本；修改后的脚本同时保持松散覆盖与新 ARC 一致。每张译文表单独识别编码，新增 UI 按该版本 DLL 的记录规则接入。不要把仅有 `update12.arc` 的原版产物当作完整中文适配。
 
-该路径不执行输入 EXE／DLL，不修改剧情表；原包和汉化信息保留，变更后的汉化产物只在玩家电脑生成。旧 `repair_onetwo_virtual_files.py` 是特定历史输入的研究配方，不是通用 v1.1 安装流程。来源与分发边界见 [TRANSLATION.md](TRANSLATION.md)、[THIRD_PARTY.md](../THIRD_PARTY.md)。
+该路径不执行输入 EXE／DLL，不修改剧情表。透明材料保留原虚拟资源和说明，恢复虚拟化 PE；字体、分页和窗口提示适配仍在玩家电脑生成。原 RAR 与透明材料经过同一个生成核心，格式转换不能代替逐模块输出比较。旧 `repair_onetwo_virtual_files.py` 是特定历史输入的研究配方，不是通用 v1.1 安装流程。来源与分发边界见 [TRANSLATION.md](TRANSLATION.md)、[THIRD_PARTY.md](../THIRD_PARTY.md)。
 
 原生字体／菜单／固定确认提示的部分字段使用简短 ASCII，避免与 ANSI 加载器编码冲突。中文菜单与已抽样正文不因此改成英文；部分主窗口标题仍可能乱码，不能靠更改系统区域或盲目覆盖标题钩子掩盖。
 
@@ -89,16 +89,18 @@ python tools/build_release.py --output dist/my-preview
 
 `requirements-build.txt` 包含运行依赖及固定版本的 PyInstaller 工具链。输出目录必须为空或尚不存在，已有输出会保留。Windows 主机构建 Windows 原生 `.exe` 包；Linux 主机构建 SteamOS／Linux 原生程序。两个平台都生成带平台名的 Fonts ZIP、`SHA256SUMS.txt` 与 `artifacts.json`；当前版本取自安装后台的 `VERSION`。
 
-构建中文包时提供自己的原始 v1.1 RAR：
+透明安装材料可用 `tools/prepare_translation.py --source <原RAR> --output <新ZIP>` 从已识别原包生成；不执行其中程序，不读取完整游戏。原资源及说明保持原字节，新增元数据记录静态提取／恢复处理。输出包含第三方汉化内容，只作本地输入或发行附件，不应提交源码。固定指纹匹配本次发行材料；不同压缩库版本或来源说明变动可能使重新生成的 ZIP 指纹不同，不能绕过识别直接发布。
+
+构建中文发行包时提供已记录指纹的透明安装材料：
 
 ```sh
-python tools/build_release.py --output dist/my-preview-cn --translation-archive './work/N10 ver1.1补丁.rar'
+python tools/build_release.py --output dist/my-preview-cn --translation-input './work/NarciBloom-translation-PC-v1.1-prepared.zip'
 ```
 
-此命令生成 Fonts 和 Chinese 两种 ZIP。Chinese 包原样附带 RAR，将入口命名为 `NarciBloomChinese.exe` 或 `NarciBloomChinese`，仍在安装时本地转换。也可向已有 Fonts 包添加原 RAR，不重新构建其原生入口：
+此命令生成 Fonts 和 Chinese 两种 ZIP。Chinese 包附带透明安装材料，将入口命名为 `NarciBloomChinese.exe` 或 `NarciBloomChinese`，仍在安装时本地生成字体适配。打包入口拒绝原 RAR，避免发行物重新带入本机已确认会被拦截的嵌套原包；运行时继续接受原 RAR。也可向已有 Fonts 包添加材料，不重新构建其原生入口：
 
 ```sh
-python tools/build_release.py --output dist/my-bundle --bundle-existing './dist/my-preview/NarciBloom-<version>-<platform>-Fonts.zip' --translation-archive './work/N10 ver1.1补丁.rar'
+python tools/build_release.py --output dist/my-bundle --bundle-existing './dist/my-preview/NarciBloom-<version>-<platform>-Fonts.zip' --translation-input './work/NarciBloom-translation-PC-v1.1-prepared.zip'
 ```
 
 打包不读取游戏安装目录，也不应把游戏、存档、生成后的汉化程序或 `.narcibloom` 装进 ZIP。构建会收集第三方许可，并联网获取所用 CPython／Tcl／OpenSSL／zlib 的对应声明；缺失或无法解释的 Linux 原生依赖来源会让构建停止，需核对报告。`build-info.json` 记录源码提交、是否有未提交修改及构建工具版本；正式候选应从干净提交构建并保留这些标识。

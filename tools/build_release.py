@@ -63,15 +63,27 @@ def runtime_notices(destination):
     (destination / 'runtime-sources.json').write_text(json.dumps(sources, indent=2), encoding='utf-8')
 
 
+def _prepared_input(path):
+    """Validate the prepared container, including when a caller renamed it."""
+    from translation_package import PREPARED_ARCHIVE_NAME, PreparedTranslation, read_package
+    path = Path(path)
+    contents = read_package(path, ['narci_onetwo'])
+    engines = [value for name, value in contents.items() if name.casefold().endswith('.exe')]
+    if (len(engines) != 1 or not isinstance(engines[0], PreparedTranslation)
+            or engines[0].module != 'narci_onetwo'):
+        raise ValueError('Chinese releases require the validated prepared PC v1.1 ZIP; '
+                         'the original RAR remains supported as manual installer input')
+    return path, PREPARED_ARCHIVE_NAME
+
+
 def bundle_existing(font_package, translation_archive, destination):
-    """Add an unchanged original RAR to a built platform package.
+    """Add an unchanged validated prepared input ZIP to a built platform package.
 
     This also allows a Linux build from CI to be bundled on Windows without
     rebuilding its native launcher or losing the ZIP executable permission bits.
     """
     sys.path.insert(0, str(ROOT / 'tools'))
-    from translation_package import read_package
-    read_package(translation_archive, [])
+    translation_archive, translation_name = _prepared_input(translation_archive)
     if not font_package.name.endswith('-Fonts.zip'):
         raise ValueError('Select an original Fonts ZIP package')
     destination.mkdir(parents=True, exist_ok=True)
@@ -96,7 +108,7 @@ def bundle_existing(font_package, translation_archive, destination):
             output.writestr(item, data)
         if not launcher:
             raise ValueError('Native launcher is missing')
-        output.write(translation_archive, new_root + '/N10 ver1.1补丁.rar')
+        output.write(translation_archive, new_root + '/' + translation_name)
     with target.open('rb') as stream:
         checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
     return {'filename': target.name, 'sha256': checksum, 'size_bytes': target.stat().st_size}
@@ -105,7 +117,8 @@ def bundle_existing(font_package, translation_archive, destination):
 def build(destination, translation_archive=None):
     sys.path.insert(0, str(ROOT / 'tools'))
     from installer_app_backend import VERSION
-    from translation_package import read_package
+    if translation_archive:
+        translation_archive, translation_name = _prepared_input(translation_archive)
     destination = destination.resolve()
     destination.mkdir(parents=True, exist_ok=True)
     if any(destination.iterdir()):
@@ -149,9 +162,9 @@ collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='Nar
             'provider': 'CPython', 'source_root': sys.base_prefix,
             'stdlib_extension_root': sysconfig.get_config_var('DESTSHARED'),
             'notice': notices / 'CPython-LICENSE.txt'}])
+        (notices / 'native-runtime-report.json').write_text(json.dumps(native, indent=2), encoding='utf-8')
         if native['unresolved_files'] or native['missing_notices'] or native['source_review_required']:
             raise ValueError('Native runtime notices need review; inspect licenses/native-runtime-report.json')
-        (notices / 'native-runtime-report.json').write_text(json.dumps(native, indent=2), encoding='utf-8')
     for package in ['evbunpack', 'aplib', 'pefile', 'PyInstaller', 'altgraph', 'pyinstaller-hooks-contrib']:
         distribution = importlib.metadata.distribution(package)
         for item in distribution.files or []:
@@ -179,8 +192,7 @@ collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='Nar
     products = []
     for chinese in ([False, True] if translation_archive else [False]):
         if chinese:
-            read_package(translation_archive, [])  # Validate original archive and preserve its bytes.
-            shutil.copy2(translation_archive, folder / 'N10 ver1.1补丁.rar')
+            shutil.copy2(translation_archive, folder / translation_name)
         name = f'NarciBloom-{VERSION}-{platform}-' + ('Chinese' if chinese else 'Fonts')
         target = destination / (name + '.zip')
         with zipfile.ZipFile(target, 'x', zipfile.ZIP_DEFLATED, compresslevel=6) as output:
@@ -202,12 +214,13 @@ collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='Nar
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--translation-archive', type=Path)
+    parser.add_argument('--translation-input', '--translation-archive', dest='translation_archive', type=Path,
+                        help='Validated prepared PC v1.1 input ZIP for the Chinese product')
     parser.add_argument('--bundle-existing', type=Path, help='Create the Chinese variant from a built Fonts ZIP')
     arguments = parser.parse_args()
     if arguments.bundle_existing:
         if not arguments.translation_archive:
-            parser.error('--bundle-existing requires --translation-archive')
+            parser.error('--bundle-existing requires --translation-input')
         print(json.dumps(bundle_existing(arguments.bundle_existing, arguments.translation_archive, arguments.output), indent=2))
     else:
         print(json.dumps(build(arguments.output, arguments.translation_archive), indent=2))

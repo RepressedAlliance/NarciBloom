@@ -14,6 +14,7 @@ import install_manager
 import installer_app_backend as backend
 from install_manager import ConflictError, InstallError, InstallManager
 from patch_narcissu_font import archive, entries
+from translation_package import PreparedTranslation
 
 
 def digest(data):
@@ -240,6 +241,33 @@ class BackendTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Ambiguous story executable'):
             backend.run_install(self.game, ['narci_himeko'])
         self.assertEqual(self.builds, [])
+
+    def test_prepared_input_is_passed_intact_and_reused_for_font_update(self):
+        module = 'narci_himeko'
+        self.add_story(module, executable_name='Narci_himeko.exe')
+        prepared = PreparedTranslation(module, b'unchanged-restored-engine', {'#txt/config.txt': b'original-table'})
+        received = []
+
+        def build(game, value, files, font_family):
+            received.append(value)
+            return types.SimpleNamespace(payload={'#txt/config.txt': value.virtual_files['#txt/config.txt']},
+                                         executable=b'built-prepared-engine', report={})
+
+        package = {module + '/Narci_himeko.exe': prepared, 'readme.txt': b'original-credits'}
+        with patch.dict(sys.modules, {'chinese_builder': types.SimpleNamespace(build_chinese_payload=build)}), \
+             patch.object(backend, 'read_package', return_value=package) as read:
+            backend.run_install(self.game, [module], chinese=True, translation_archive='prepared.zip')
+            backend.run_install(self.game, [module], chinese=False)
+            self.assertEqual(read.call_count, 2)
+            self.assertEqual(read.call_args.args, (str(Path('prepared.zip').resolve()), [module]))
+        self.assertEqual(received, [prepared, prepared])
+        record = self.manager().read_record()
+        self.assertEqual(record['metadata']['stories'][module]['language'], 'zh-CN')
+        self.assertIn(module + '/Narci_himeko.exe', record['files'])
+        self.assertEqual((self.game / module / 'NarciBloom-translation-readme.txt').read_bytes(), b'original-credits')
+        backend.run_uninstall(self.game)
+        self.assertEqual((self.game / module / 'Narci_himeko.exe').read_bytes(), self.originals[module][0])
+        self.assertFalse((self.game / module / '#txt/config.txt').exists())
 
 
 if __name__ == "__main__":

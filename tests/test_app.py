@@ -38,6 +38,16 @@ class EntryPointTests(unittest.TestCase):
             (folder / app.ARCHIVE_NAME).write_bytes(b"test")
             self.assertEqual(app.companion_archive(folder).name, app.ARCHIVE_NAME)
 
+    def test_named_prepared_companion_takes_priority_over_original_rar(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / 'unrelated-v1.1.zip').write_bytes(b'test')
+            self.assertIsNone(app.companion_archive(folder))
+            (folder / app.ARCHIVE_NAME).write_bytes(b'original')
+            prepared = folder / app.PREPARED_ARCHIVE_NAME
+            prepared.write_bytes(b'prepared')
+            self.assertEqual(app.companion_archive(folder), prepared)
+
 
 class GuiTests(unittest.TestCase):
     def setUp(self):
@@ -101,6 +111,20 @@ class GuiTests(unittest.TestCase):
         self.assertIn("recovery", window.log.get("1.0", "end"))
         self.assertEqual(str(window.install_button.cget("state")), "normal")
         self.assertEqual(str(window.uninstall_button.cget("state")), "normal")
+
+    def test_chinese_gui_passes_prepared_input_without_asking_for_original_rar(self):
+        window = self.create('chinese', 'zh')
+        window.apply_scan({'path': str(TOOLS), 'installed_version': None, 'modules': [
+            {'id': 'narci_himeko', 'title': 'Himeko', 'language': 'ja', 'supported': True}]})
+        prepared = str(TOOLS / app.PREPARED_ARCHIVE_NAME)
+        window.archive.set(prepared)
+        calls = []
+        self.backend.run_install = lambda *args, **kwargs: calls.append((args, kwargs))
+        with patch.object(window, 'choose_archive', side_effect=AssertionError('Prepared input is already selected')), \
+             patch.object(window, 'run_operation', side_effect=lambda operation, success: operation()):
+            window.install()
+        self.assertEqual(calls[0][1]['translation_archive'], prepared)
+        self.assertTrue(calls[0][1]['chinese'])
 
     def test_backend_missing_produces_recoverable_player_message(self):
         with patch.object(app.importlib, "import_module", side_effect=ImportError("synthetic missing backend")):

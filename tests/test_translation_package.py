@@ -1,6 +1,8 @@
 """Synthetic package fingerprints and mocked libarchive ABI; no translation fixtures."""
 import ctypes
 import hashlib
+import copy
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -8,10 +10,13 @@ import sys
 import tempfile
 import types
 import unittest
+import warnings
+import zipfile
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import translation_package as package
+import prepare_translation as preparation
 
 
 def digest(data):
@@ -147,6 +152,178 @@ class PackageValidationTests(unittest.TestCase):
             result = package.read_package(self.path, [])
         self.assertEqual(result, {"readme.txt": self.contents["readme.txt"]})
         self.assertEqual(run.call_count, 1)
+
+
+class PreparedPackageTests(unittest.TestCase):
+    """Tiny synthetic ZIPs, with recognition metadata explicitly pinned per test."""
+    root = 'prepared-input/'
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.path = Path(self.temporary.name) / 'renamed.input'
+        self.source_members = [
+            {'path': 'narci_iris/original.exe', 'size_bytes': 8, 'sha256': digest(b'original')},
+            {'path': 'readme.txt', 'size_bytes': 7, 'sha256': digest(b'credits')},
+        ]
+        self.files = {'readme.txt': b'credits', 'source-notice.json': b'{}',
+                      'CACHE-NOTICE.txt': b'processed input notice',
+                      'modules/narci_iris/engine.exe': b'synthetic-restored-engine',
+                      'modules/narci_iris/virtual/#mjo/config.mjo': b'synthetic-script'}
+        records = {name: {'path': name, 'size_bytes': len(data), 'sha256': digest(data)}
+                   for name, data in self.files.items()}
+        virtual = dict(records['modules/narci_iris/virtual/#mjo/config.mjo'],
+                       source_virtual_path='#mjo/config.mjo')
+        original_archive = {'filename': 'original.rar', 'size_bytes': 5, 'sha256': digest(b'raw!!')}
+        self.manifest = {'schema': 1, 'source_archive': original_archive,
+                         'source_members': self.source_members, 'files': list(records.values()),
+                         'modules': {'narci_iris': {
+                             'source_member': 'narci_iris/original.exe',
+                             'source_member_sha256': self.source_members[0]['sha256'],
+                             'engine': records['modules/narci_iris/engine.exe'],
+                             'virtual_files': [virtual]}}}
+        self.notice = {'input_fingerprint': {'archive': original_archive,
+                                             'members': self.source_members}}
+        self.patch = patch.object(package, 'source_notice', return_value=self.notice)
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def make_zip(self, *, files=None, manifest=None, extra=(), manifest_bytes=None):
+        files = self.files if files is None else files
+        manifest = self.manifest if manifest is None else manifest
+        manifest_bytes = (json.dumps(manifest).encode() if manifest_bytes is None else manifest_bytes)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            with zipfile.ZipFile(self.path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                for name, data in files.items():
+                    archive.writestr(self.root + name, data)
+                archive.writestr(self.root + 'manifest.json', manifest_bytes)
+                for name, data in extra:
+                    archive.writestr(name, data)
+        self.notice['prepared_input'] = {
+            'root_directory': self.root[:-1],
+            'archive': {'size_bytes': self.path.stat().st_size, 'sha256': digest(self.path.read_bytes())},
+            'manifest': {'size_bytes': len(manifest_bytes), 'sha256': digest(manifest_bytes)},
+        }
+
+    def test_selected_module_returns_prepared_sources_and_original_readme(self):
+        self.make_zip()
+        with patch.object(package.subprocess, 'run', side_effect=AssertionError('No tar for ZIP')):
+            result = package.read_package(self.path, ['narci_iris'])
+        self.assertEqual(result['readme.txt'], b'credits')
+        source = result['narci_iris/original.exe']
+        self.assertIsInstance(source, package.PreparedTranslation)
+        self.assertEqual(source.module, 'narci_iris')
+        self.assertEqual(source.restored_engine, b'synthetic-restored-engine')
+        self.assertEqual(source.virtual_files, {'#mjo/config.mjo': b'synthetic-script'})
+        self.assertEqual(package.read_package(self.path, []), {'readme.txt': b'credits'})
+
+    def test_container_size_and_hash_are_checked_before_opening_zip(self):
+        self.make_zip()
+        original = self.path.read_bytes()
+        for bad in (original + b'x', b'x' * len(original)):
+            with self.subTest(size=len(bad)):
+                self.path.write_bytes(bad)
+                with patch.object(package.zipfile, 'ZipFile', side_effect=AssertionError('No ZIP parsing')):
+                    with self.assertRaises(ValueError):
+                        package.read_package(self.path, ['narci_iris'])
+
+    def test_every_member_is_checked_even_when_no_module_is_selected(self):
+        changed = dict(self.files)
+        name = 'modules/narci_iris/virtual/#mjo/config.mjo'
+        for bad in (b'x' * len(changed[name]), changed[name] + b'x'):
+            changed[name] = bad
+            self.make_zip(files=changed)
+            with self.subTest(size=len(bad)), self.assertRaisesRegex(ValueError, 'size|hash'):
+                package.read_package(self.path, [])
+
+    def test_manifest_fingerprint_and_original_readme_are_checked(self):
+        self.make_zip()
+        self.notice['prepared_input']['manifest']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'hash'):
+            package.read_package(self.path, [])
+        manifest = copy.deepcopy(self.manifest)
+        files = dict(self.files, **{'readme.txt': b'changed'})
+        next(item for item in manifest['files'] if item['path'] == 'readme.txt')['sha256'] = digest(b'changed')
+        self.make_zip(files=files, manifest=manifest)
+        with self.assertRaisesRegex(ValueError, 'original readme'):
+            package.read_package(self.path, [])
+
+    def test_unsafe_duplicate_and_special_zip_members_are_rejected(self):
+        symlink = zipfile.ZipInfo(self.root + 'symlink')
+        symlink.create_system = 3
+        symlink.external_attr = 0o120777 << 16
+        compressed = zipfile.ZipInfo(self.root + 'other-compression')
+        compressed.compress_type = zipfile.ZIP_BZIP2
+        names = ['../outside', '/absolute', self.root + 'a/../b', self.root + 'C:drive',
+                 self.root + 'folder\\file', self.root + 'NUL.txt', self.root + 'trailing. ',
+                 self.root + 'directory/', self.root + 'readme.txt', self.root + 'README.TXT',
+                 symlink, compressed]
+        for name in names:
+            self.make_zip(extra=[(name, b'x')])
+            with self.subTest(name=str(name)), self.assertRaises(ValueError):
+                package.read_package(self.path, [])
+
+    def test_missing_extra_duplicate_json_keys_and_manifest_files_are_rejected(self):
+        files = dict(self.files)
+        del files['CACHE-NOTICE.txt']
+        self.make_zip(files=files)
+        with self.assertRaises(ValueError):
+            package.read_package(self.path, [])
+        self.make_zip(extra=[(self.root + 'unexpected', b'x')])
+        with self.assertRaises(ValueError):
+            package.read_package(self.path, [])
+        self.make_zip(manifest_bytes=b'{"schema":1,"schema":1}')
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            package.read_package(self.path, [])
+        manifest = copy.deepcopy(self.manifest)
+        manifest['files'].append(dict(manifest['files'][0], path='README.TXT'))
+        self.make_zip(manifest=manifest)
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            package.read_package(self.path, [])
+
+    def test_source_identity_and_cross_module_paths_are_rejected(self):
+        for change in ('archive', 'module', 'engine', 'virtual', 'record'):
+            manifest = copy.deepcopy(self.manifest)
+            record = manifest['modules']['narci_iris']
+            if change == 'archive': manifest['source_archive']['sha256'] = '0' * 64
+            elif change == 'module': record['source_member'] = 'other/original.exe'
+            elif change == 'engine': record['engine']['path'] = 'modules/other/engine.exe'
+            elif change == 'virtual': record['virtual_files'][0]['source_virtual_path'] = '../escape'
+            else: record['virtual_files'][0]['sha256'] = '0' * 64
+            self.make_zip(manifest=manifest)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                package.read_package(self.path, ['narci_iris'])
+        self.make_zip()
+        with self.assertRaisesRegex(ValueError, 'selection'):
+            package.read_package(self.path, ['other'])
+
+    def test_preparation_is_deterministic_preserves_payload_and_avoids_self_reference(self):
+        self.notice['prepared_input'] = {'obsolete_fingerprint': 'not embedded'}
+        first = Path(self.temporary.name) / 'prepared-one.zip'
+        second = Path(self.temporary.name) / 'prepared-two.zip'
+        inputs = {'narci_iris/original.exe': b'original', 'readme.txt': b'credits'}
+        with patch.object(preparation, 'source_notice', return_value=self.notice), \
+             patch.object(preparation, 'read_package', side_effect=lambda *args: dict(inputs)), \
+             patch.object(preparation, 'extract_virtual_files', return_value={'#mjo/config.mjo': b'script'}), \
+             patch.object(preparation, 'restore_virtual_pe', return_value=b'restored'):
+            metadata = preparation.prepare_input('recognized.rar', first)
+            same = preparation.prepare_input('recognized.rar', second)
+            with self.assertRaises(FileExistsError):
+                preparation.prepare_input('recognized.rar', first)
+        self.assertEqual(metadata, same)
+        self.assertEqual(first.read_bytes(), second.read_bytes())
+        self.notice['prepared_input'] = metadata
+        result = package.read_package(first, ['narci_iris'])
+        self.assertEqual(result['readme.txt'], b'credits')
+        self.assertEqual(result['narci_iris/original.exe'].virtual_files, {'#mjo/config.mjo': b'script'})
+        self.assertEqual(result['narci_iris/original.exe'].restored_engine, b'restored')
+        with zipfile.ZipFile(first) as archive:
+            prefix = preparation.ROOT_DIRECTORY + '/'
+            notice = json.loads(archive.read(prefix + 'source-notice.json'))
+            self.assertNotIn('prepared_input', notice)
+            self.assertNotIn('prototype', archive.read(prefix + 'manifest.json').decode())
+            self.assertTrue(all(item.date_time == (1980, 1, 1, 0, 0, 0) for item in archive.infolist()))
 
 
 class LibarchiveInterfaceTests(unittest.TestCase):

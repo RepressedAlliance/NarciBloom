@@ -6,6 +6,7 @@ import re
 from build_font_settings import Script, build_overrides
 from patch_narcissu_font import archive, entries
 from translation_adapter import extract_virtual_files, restore_virtual_pe
+from translation_package import PreparedTranslation
 import pefile
 
 
@@ -276,13 +277,26 @@ def native_dialogs(executable):
 def build_chinese_payload(game, packed_exe_bytes, stock_files, font_family=None) -> ChineseBuild:
     """Build module-relative payload and a separate restored engine in memory.
 
+    Input may be original packed bytes or a validated PreparedTranslation.
     `stock_files` is the already-expanded effective original resource mapping,
     as accepted by build_overrides. The backend supplies the original EXE name
     when installing `executable`. All other results use module-relative paths.
     """
     if game not in _CAPTION_HOOKS:
         raise ValueError('unsupported Chinese module')
-    virtual = extract_virtual_files(packed_exe_bytes)
+    if isinstance(packed_exe_bytes, PreparedTranslation):
+        if packed_exe_bytes.module != game:
+            raise ValueError('prepared translation belongs to a different module')
+        virtual = packed_exe_bytes.virtual_files
+        executable = packed_exe_bytes.restored_engine
+    else:
+        virtual = extract_virtual_files(packed_exe_bytes)
+        executable = restore_virtual_pe(packed_exe_bytes)
+    return _build_chinese_sources(game, virtual, executable, stock_files, font_family)
+
+
+def _build_chinese_sources(game, virtual, executable, stock_files, font_family):
+    """Apply the same font/UI changes to raw and prepared source bytes."""
     effective = effective_chinese_sources(stock_files, virtual)
     overrides, report, _functions, _hashes = build_overrides(game, effective, 'zh-CN', font_family)
     payload = dict(virtual)
@@ -314,7 +328,7 @@ def build_chinese_payload(game, packed_exe_bytes, stock_files, font_family=None)
             raise ValueError('required Chinese translation DLL is missing')
         payload[name] = _caption_assignment(payload[name], digest, rva, expected)
         hooks.append({'dll': name, 'rva': rva, 'change': 'preserve original window and child-control captions'})
-    executable, dialogs = native_dialogs(restore_virtual_pe(packed_exe_bytes))
+    executable, dialogs = native_dialogs(executable)
     report = dict(report, source='PC Chinese v1.1 virtual files', ui_translation_tables=table_reports,
                   caption_hooks=hooks, **dialogs, payload_files=sorted(payload))
     return ChineseBuild(payload, executable, report)

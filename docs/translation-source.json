@@ -37,9 +37,12 @@
     "modified_redistribution_permission": "not_explicitly_stated",
     "game_redistribution_permission": "not_granted_by_this_notice",
     "bundle_permission": "interpreted_from_general_redistribution_notice_not_separately_confirmed",
-    "planned_distribution": "unchanged_original_archive_with_separate_tool_local_generation",
-    "ship_pre_modified_translation_executables": false,
-    "ship_extracted_translation_resources": false,
+    "planned_distribution": "prepared_input_with_unchanged_extracted_virtual_files_and_restored_engines_font_changes_generated_locally",
+    "prepared_redistribution_basis": "Interpreted from the general redistribution notice, which does not expressly prohibit unpacking or repackaging. This specific preprocessing was not separately confirmed by the translation group; restoration changes executable bytes and does not establish a complete third-party rights chain.",
+    "ship_pre_modified_translation_executables": true,
+    "pre_modified_executable_scope": "EVB virtual layer removed and PE restored only; font, caption and pagination modifications generated on the player computer.",
+    "ship_extracted_translation_resources": true,
+    "extracted_resource_scope": "All 247 unchanged files supplied inside the original translation package, including code, scripts, UI, images and sound effects; no additional game media collected.",
     "requires_separate_game_installation": true,
     "legal_safety_guarantee": false
   },
@@ -57,6 +60,21 @@
       "美工": ["心神不宁"],
       "测试": ["y酱", "Setsumi22", "flunk", "selenar", "yoko4ever"]
     }
+  },
+  "prepared_input": {
+    "archive": {
+      "filename": "NarciBloom-translation-PC-v1.1-prepared.zip",
+      "size_bytes": 94474514,
+      "sha256": "7437994224d5c22b7323f60c5a37b4cbbc163e47de4db61c94639aa839cc9a8c"
+    },
+    "root_directory": "NarciBloom-translation-PC-v1.1-prepared",
+    "manifest": {
+      "size_bytes": 115432,
+      "sha256": "dec90d81ada9dcf0145557fa6938dc4abe2287973ee6442b659b84c3e98f2ef5"
+    },
+    "processing": "Static virtual-file extraction and PE restoration only; font, caption and pagination changes are generated locally at installation.",
+    "scope": "Five restored engines and 247 unchanged virtual files from the original translation package, including translation-supplied images and sound effects; original attribution preserved. No additional game media was collected.",
+    "recognition_is_not_authenticity_safety_or_permission_verification": true
   },
   "input_fingerprint": {
     "status": "locally_observed_sample",

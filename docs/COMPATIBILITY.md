@@ -9,7 +9,7 @@
 - 输入：已识别的五模块 Steam 日文、Steam 英文，以及风铃汉化组 PC v1.1，共十五种模块／语言组合。识别标记见 [source-profiles.json](source-profiles.json) 与 [translation-source.json](translation-source.json)；未知版本及相关资源冲突会停止处理。文件标记不是来源真实性或安全性认证。
 - 安装器：Windows 与 SteamOS／Linux 各有原生入口；SteamOS 安装器无需 Proton，游戏仍使用其 Windows 引擎及 Proton。安装与恢复方法见 [INSTALLATION.md](INSTALLATION.md)。
 
-Fonts 保留受支持输入的当前剧情语言；Chinese 从原样保留的 PC v1.1 RAR 在本机生成中文与相同字体功能。中文来源、署名和分发边界见 [TRANSLATION.md](TRANSLATION.md)。
+Fonts 保留受支持输入的当前剧情语言；Chinese 从 PC v1.1 透明安装材料在本机生成中文与相同字体功能，也继续接受受支持原 RAR。中文来源、署名和分发边界见 [TRANSLATION.md](TRANSLATION.md)。
 
 ## 构建与安装检查
 
