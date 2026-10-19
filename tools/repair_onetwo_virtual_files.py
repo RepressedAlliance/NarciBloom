@@ -111,6 +111,6 @@ check_vm(functions,hashes)
 report={'source':'original Chinese patch virtual files','added_menu_translations':added,
         'menu_hooks':hooks,'dialog_resource_changes':changes,'caption_hooks':title_hooks,'console_regions':rects,
         'menu_logic_checks':'passed','source_files':[str(p.relative_to(repair)) for p in repair.rglob('*') if p.is_file()]}
-(TOOLS/'repair-onetwo-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+(TOOLS/'repair-onetwo-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({'staged_files':len(report['source_files']),'menu_translations':len(translated),
                   'dialog_changes':len(changes),'menu_logic_checks':'passed'},ensure_ascii=False))

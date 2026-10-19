@@ -23,6 +23,20 @@ FONT = 0x391053C5
 PAGE = 0x644BB6D2
 OUT = TOOLS / 'staged'
 
+# Menu encoding follows the active game/translation loader, not the PC locale.
+# Keep the existing Chinese recipe byte-for-byte compatible by default.
+MENUS = {
+    'zh-CN': dict(encoding='gbk', back='返回', family='更换字体', size='字号：',
+                  hint='  （点此选择大小）', current='  （当前）', entry='字体 / 字号',
+                  heading='当前字号：', help='点选大小，返回剧情后生效  ·  推荐 36'),
+    'ja': dict(encoding='cp932', back='戻る', family='フォント変更', size='サイズ：',
+               hint='  （サイズ選択）', current='  （現在）', entry='文字サイズ',
+               heading='文字サイズ：', help='本文に戻ると反映  /  推奨 36'),
+    'en': dict(encoding='cp932', back='Back', family='Font', size='Size: ',
+               hint='  (select size)', current='  (current)', entry='Font / Size',
+               heading='Font size: ', help='Applies in story  /  Try 36'),
+}
+
 
 @dataclass
 class Ins:
@@ -141,11 +155,12 @@ def emit(name,*values):
 
 
 class Builder:
-    def __init__(self):
+    def __init__(self, encoding='gbk'):
+        self.encoding=encoding
         self.code=bytearray();self.labels={};self.refs=[]
     def op(self,name,*args):self.code.extend(emit(name,*args));return self
     def integer(self,value):return self.op('ldc.i',value)
-    def text(self,value):return self.op('ldstr',value.encode('gbk')+b'\0')
+    def text(self,value):return self.op('ldstr',value.encode(self.encoding)+b'\0')
     def load(self,hashed,scope=0,kind=0,slot=0):return self.op('ld',(scope<<5)|(kind<<8),hashed,slot)
     def store(self,hashed,scope=0,kind=0,slot=0):return self.op('st.i' if kind==0 else 'st.s',(scope<<5)|(kind<<8),hashed,slot).op('pop')
     def syscall(self,hashed,count,result=False):return self.op('syscall' if result else 'syscallp',hashed,count)
@@ -173,8 +188,9 @@ def apply_function():
     return b.ret().finish()
 
 
-def draw_function():
-    b=Builder().prologue()
+def draw_function(language='zh-CN'):
+    menu=MENUS[language]
+    b=Builder(menu['encoding']).prologue()
     def box(x,y,w,h,color):
         for value in [color,h,w,y,x]:b.integer(value)
         b.load(PAGE,scope=1).syscall(0xD01BE374,6)
@@ -184,9 +200,9 @@ def draw_function():
     def locate(x,y):b.integer(y).integer(x).load(PAGE,scope=1).syscall(0x57F6310D,3)
     box(105,493,638,81,0x225785)
     font(28);locate(120,499)
-    b.text('当前字号：').load(SIZE).syscall(0x6F769889,1,result=True).op('add.s').syscall(0x35A89417,1)
+    b.text(menu['heading']).load(SIZE).syscall(0x6F769889,1,result=True).op('add.s').syscall(0x35A89417,1)
     font(20);locate(350,503)
-    b.text('点选大小，返回剧情后生效  ·  推荐 36').syscall(0x35A89417,1)
+    b.text(menu['help']).syscall(0x35A89417,1)
     for index,size in enumerate(SIZES):
         x=120+index*100
         box(x,534,88,36,0x78B9DF)
@@ -219,7 +235,7 @@ def init_function(apply_hash,draw_hash,click_hash,noop_hash):
     return b.ret().finish()
 
 
-def patch_config(blob):
+def patch_config(blob, language='zh-CN'):
     s=Script(blob)
     hashes={name:hash32('$cdx_font_'+name+'@NARCI_CONFIG') for name in ['apply','draw','click','noop','init']}
     targets=[]
@@ -230,7 +246,7 @@ def patch_config(blob):
                 targets.append(i)
     assert len(targets)==1,len(targets)
     s.hook_after(targets[0],hashes['init'])
-    new={hashes['apply']:apply_function(),hashes['draw']:draw_function(),
+    new={hashes['apply']:apply_function(),hashes['draw']:draw_function(language),
          hashes['click']:click_function(hashes['apply'],hashes['draw']),
          hashes['noop']:Builder().prologue(5).ret().finish(),
          hashes['init']:init_function(hashes['apply'],hashes['draw'],hashes['click'],hashes['noop'])}
@@ -246,20 +262,21 @@ def patch_loader(blob):
     return s.finish(),s.hooks
 
 
-def pause_selector_function(apply_hash):
+def pause_selector_function(apply_hash, language='zh-CN'):
     """1+2 uses a text pause/settings menu instead of the later CONFIG page."""
     choice=hash32('_cdx_choice@')
-    b=Builder().op('argcheck',bytes([2,0])).op('alloca',bytes([0]))
+    menu=MENUS[language]
+    b=Builder(menu['encoding']).op('argcheck',bytes([2,0])).op('alloca',bytes([0]))
     b.call(apply_hash).label('menu')
     # Majiro passes arguments right-to-left; select returns a one-based index.
-    b.text('返回').text('更换字体')
-    b.text('字号：').load(SIZE).syscall(0x6F769889,1,result=True).op('add.s')
-    b.text('  （点此选择大小）').op('add.s').call(0x0A7A489C,3,result=True)
+    b.text(menu['back']).text(menu['family'])
+    b.text(menu['size']).load(SIZE).syscall(0x6F769889,1,result=True).op('add.s')
+    b.text(menu['hint']).op('add.s').call(0x0A7A489C,3,result=True)
     b.store(choice,scope=3,slot=0)
     b.load(choice,scope=3,slot=0).integer(1).op('ceq.i').branch('brfalse','family')
     for size in reversed(SIZES):
         b.load(SIZE).integer(size).op('ceq.i').branch('brfalse','plain'+str(size))
-        b.text(str(size)+'  （当前）').branch('br','ready'+str(size))
+        b.text(str(size)+menu['current']).branch('br','ready'+str(size))
         b.label('plain'+str(size)).text(str(size)).label('ready'+str(size))
     b.call(0x0A7A489C,6,result=True).store(choice,scope=3,slot=0)
     for index,size in enumerate(SIZES):
@@ -272,7 +289,7 @@ def pause_selector_function(apply_hash):
     return b.finish()
 
 
-def patch_pause(blob):
+def patch_pause(blob, language='zh-CN'):
     s=Script(blob)
     hashes={'apply':hash32('$cdx_font_apply@NARCI_PAUSE'),
             'selector':hash32('$cdx_font_selector$@NARCI_PAUSE')}
@@ -282,10 +299,11 @@ def patch_pause(blob):
     # Reuse the existing font settings entry; do not move the other controls.
     labels=[i for i in s.ins if i.name=='ldstr' and i.fields['s'].rstrip(b'\0')=='フォント設定'.encode('cp932')]
     assert len(labels)==1
-    label=labels[0];raw='字体 / 字号'.encode('gbk')+b'\0'
+    menu=MENUS[language]
+    label=labels[0];raw=menu['entry'].encode(menu['encoding'])+b'\0'
     assert len(raw)<=len(label.fields['s'])
     s.code[label.offset+4:label.offset+len(label.raw)]=raw.ljust(len(label.fields['s']),b'\0')
-    functions={hashes['apply']:apply_function(),hashes['selector']:pause_selector_function(hashes['apply'])}
+    functions={hashes['apply']:apply_function(),hashes['selector']:pause_selector_function(hashes['apply'],language)}
     for h,code in functions.items():s.add(h,code)
     return s.finish(),s.hooks,functions,hashes
 
@@ -317,7 +335,9 @@ def patch_console_bounded(blob):
     return s.finish(),changes
 
 
-def config_fonts(blob,size=DEFAULT):
+def config_fonts(blob,size=DEFAULT,font_family=None):
+    if font_family is not None and (not font_family.strip() or any(c in font_family for c in ',\r\n')):
+        raise ValueError('Font family must be a nonempty single config field')
     text=blob.decode('cp932');changes=[]
     for marker,width in [('CONFONT',3),('NAMEFONT',2)]:
         at=text.index('// '+marker)
@@ -326,6 +346,10 @@ def config_fonts(blob,size=DEFAULT):
         pattern=r'^\d+,\s*\d+'+(r',\s*\d+' if width==3 else '')+r'(?=\s*//)'
         tail,count=re.subn(pattern,replacement,tail,count=1,flags=re.M)
         assert count==1,(marker,count)
+        if font_family is not None:
+            tail,count=re.subn(r'^[^/\r\n,][^\r\n,]*(?=,\s*[01]\s*//)',
+                               lambda match:font_family,tail,count=1,flags=re.M)
+            assert count==1,(marker,'font family',count)
         text=head+tail;changes.append(marker)
     return text.encode('cp932')
 
@@ -344,17 +368,17 @@ def original_sources(folder):
     return files,exe,blob,embedded
 
 
-def build(game):
+def build(game, language='zh-CN', font_family=None):
     folder=ROOT/game;files,exe,exe_blob,embedded=original_sources(folder)
     override={}
     for name in ['sysdata.cfg','sysdata27.cfg','ナルキ１全画面中央.cfg','プロダクツ用設定.cfg']:
-        if name in files:override[name]=config_fonts(files[name])
+        if name in files:override[name]=config_fonts(files[name],font_family=font_family)
     if game=='narci_onetwo':
         setting_script='pausemenu.mjo'
-        config,hooks,new_functions,hashes=patch_pause(files[setting_script])
+        config,hooks,new_functions,hashes=patch_pause(files[setting_script],language)
     else:
         setting_script='config.mjo'
-        config,hooks,new_functions,hashes=patch_config(files[setting_script])
+        config,hooks,new_functions,hashes=patch_config(files[setting_script],language)
     loader,load_hooks=patch_loader(files['load_sysdata.mjo'])
     console,rects=patch_console_bounded(files['console.mjo'])
     override.update({setting_script:config,'load_sysdata.mjo':loader,'console.mjo':console})
@@ -363,12 +387,14 @@ def build(game):
     dest=OUT/game;dest.mkdir(parents=True,exist_ok=True)
     (dest/'update12.arc').write_bytes(archive(override))
     report={'game':game,'source_exe':str(exe),'source_sha256':hashlib.sha256(exe_blob).hexdigest(),
+            'menu_language':language,'menu_encoding':MENUS[language]['encoding'],
+            'font_family_override':font_family,
             'override_files':list(override),'config_hooks':hooks,'loader_hooks':load_hooks,
             'text_rectangles':rects,'embedded_directory_renames':renames,
             'font_sizes':SIZES,'default_font_size':DEFAULT,'ui_functions':hashes,
             'settings_script':setting_script,
             'archive_bytes':(dest/'update12.arc').stat().st_size}
-    (dest/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+    (dest/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     return report,new_functions,hashes
 
 
@@ -377,9 +403,12 @@ if __name__=='__main__':
     games=['narci_iris','narci_onetwo','narci_himeko','narci_zero','narci_sumire']
     parser=argparse.ArgumentParser(description='Stage font overrides; never install into the game')
     parser.add_argument('--game', choices=games, action='append')
+    parser.add_argument('--menu-language', choices=MENUS, default='zh-CN',
+                        help='New menu text only: ja/en use the stock CP932 engine; zh-CN uses the Chinese loader')
+    parser.add_argument('--font-family', help='Optional installed font family for config defaults; otherwise preserve the source font')
     args=parser.parse_args()
     if not ROOT.is_dir():parser.error('Set NARCIBLOOM_GAME_DIR to the anthology installation directory')
     OUT.mkdir(parents=True,exist_ok=True)
     for game in args.game or games:
-        report,_,_=build(game)
+        report,_,_=build(game,args.menu_language,args.font_family)
         print(json.dumps(report,ensure_ascii=False))

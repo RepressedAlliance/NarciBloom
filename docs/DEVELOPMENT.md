@@ -40,6 +40,32 @@ $env:NARCIBLOOM_WORK_DIR = Join-Path (Get-Location) 'work'
 
 仅指向自有游戏的受支持原始版本。当前流程不负责识别已安装其他修改的版本，也不应使用自己的已修改游戏反复覆盖生成新的基线。
 
+## 原版与汉化的构建选择
+
+字号、持久设置和文本区修正共用实现，新增菜单文字按目标加载器编码：
+
+- 日文原版：加 `--menu-language ja`，使用 CP932 日文菜单，不需要汉化 DLL 或虚拟文件提取。
+- 希望在日文原版中使用英文的新增菜单：加 `--menu-language en`，使用 CP932 的 ASCII 子集。此选项不翻译剧情，也不代表 Steam 英文发行文件已适配。
+- 现有汉化：默认 `--menu-language zh-CN`，保持原有 GBK 菜单生成；1＋2 还必须执行下文的汉化虚拟文件步骤。
+
+中文 Windows 上的 Iris 曾在原版默认字体下同时出现正文和动态菜单乱码，停用字体补丁后仍可复现。在游戏设置的字体选择框中选用电脑已有的日文字体 `UD Digi Kyokasho N` 后，原版正文恢复。先确认原版使用的字体能正常显示日文，再检查新增菜单；`en` 可让新增菜单避免非 ASCII 字形问题，但不解决正文乱码。无需修改系统区域；其他模块的字体环境仍待分别实测。
+
+需要指定已安装的默认字体时，可额外使用 `--font-family`。它只改构建配置中的正文和角色名字体，不安装字体，也不改变系统设置；省略时保留源文件的字体。不要为汉化版盲目选用只适合日文的字体。例如：
+
+```sh
+python tools/build_font_settings.py --game narci_iris --menu-language ja --font-family "UD Digi Kyokasho N"
+```
+
+例如日文原版 1＋2：
+
+```sh
+python tools/build_font_settings.py --game narci_onetwo --menu-language ja
+```
+
+输出仍仅在工作目录。原版 1＋2 的构建结果包含完整的七项覆盖资源，不运行 `repair_onetwo_virtual_files.py`；后者专用于已测试的汉化。开发者可在独立游戏副本中放入对应 `update12.arc` 做运行检查。不要混用不同语言的构建输出，游戏运行时不要替换文件。
+
+工具尚未自动识别版本或处理安装顺序：安装、更换汉化后必须重新从对应输入构建，不能假定先装字体补丁后覆盖汉化仍然有效。文件标识和当前已确认输入见 [VERSIONS.md](VERSIONS.md)。
+
 ## 四个后日谈/附加篇章
 
 例如构建 Iris：

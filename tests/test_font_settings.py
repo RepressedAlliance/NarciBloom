@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from build_font_settings import (Builder, Script, SIZES, apply_function, draw_function,
                                 click_function, init_function, pause_selector_function,
-                                patch_console_bounded, hash32)
+                                patch_console_bounded, patch_pause, config_fonts, MENUS, hash32)
 from check_font_settings import check_vm
 
 
@@ -21,22 +21,55 @@ def synthetic_dialogue(height, width=560, y=356):
 
 
 class FontSettingsTests(unittest.TestCase):
+    def test_optional_font_family_changes_only_font_config_fields(self):
+        source = ('// CONFONT\r\nＭＳ ゴシック, 0 // face\r\n17, 8, 20 // size\r\n'
+                  '// NAMEFONT\r\nＭＳ ゴシック, 0 // face\r\n17, 8 // size\r\n'
+                  '// NEXT\r\nOriginal text\r\n').encode('cp932')
+        default = config_fonts(source)
+        chosen = config_fonts(source, font_family='UD Digi Kyokasho N')
+        self.assertEqual(chosen, default.replace('ＭＳ ゴシック'.encode('cp932'),
+                                                b'UD Digi Kyokasho N'))
+        for invalid in ['', 'A,B', 'A\rB', 'A\nB']:
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                config_fonts(source, font_family=invalid)
+
     def test_pause_menu_all_choices_and_current_value(self):
         hashes = {name: hash32('$cdx_font_' + name + '@NARCI_PAUSE')
                   for name in ['apply', 'selector']}
-        functions = {hashes['apply']: apply_function(),
-                     hashes['selector']: pause_selector_function(hashes['apply'])}
-        check_vm(functions, hashes)
+        for language in MENUS:
+            with self.subTest(language=language):
+                functions = {hashes['apply']: apply_function(),
+                             hashes['selector']: pause_selector_function(hashes['apply'], language)}
+                check_vm(functions, hashes, language)
 
     def test_config_menu_all_choices_and_control_bounds(self):
         hashes = {name: hash32('$cdx_font_' + name + '@NARCI_CONFIG')
                   for name in ['apply', 'draw', 'click', 'noop', 'init']}
-        functions = {hashes['apply']: apply_function(), hashes['draw']: draw_function(),
-                     hashes['click']: click_function(hashes['apply'], hashes['draw']),
-                     hashes['noop']: Builder().prologue(5).ret().finish(),
-                     hashes['init']: init_function(hashes['apply'], hashes['draw'],
-                                                  hashes['click'], hashes['noop'])}
-        check_vm(functions, hashes)
+        for language in MENUS:
+            with self.subTest(language=language):
+                functions = {hashes['apply']: apply_function(), hashes['draw']: draw_function(language),
+                             hashes['click']: click_function(hashes['apply'], hashes['draw']),
+                             hashes['noop']: Builder().prologue(5).ret().finish(),
+                             hashes['init']: init_function(hashes['apply'], hashes['draw'],
+                                                          hashes['click'], hashes['noop'])}
+                check_vm(functions, hashes, language)
+
+    def test_localized_pause_entry_preserves_following_instructions(self):
+        code = (Builder('cp932').text('フォント設定').text('物語の本文')
+                .integer(0).integer(0).syscall(0x95FF28F2, 2, result=True).op('ret').finish())
+        blob = (struct.pack('<16sIII', b'MajiroObjV1.000\0', 0, 1, 1)
+                + struct.pack('<II', 0x1234, 0) + struct.pack('<I', len(code)) + code)
+        before = Script(blob)
+        for language, menu in MENUS.items():
+            with self.subTest(language=language):
+                patched, _, functions, hashes = patch_pause(blob, language)
+                after = Script(patched)
+                self.assertEqual(after.ins[0].fields['s'].rstrip(b'\0').decode(menu['encoding']), menu['entry'])
+                self.assertEqual(after.ins[1].raw, before.ins[1].raw)
+                self.assertTrue({i.offset for i in before.ins} <= {i.offset for i in after.ins})
+                self.assertEqual(next(i.raw for i in after.ins if i.offset == before.ins[-1].offset),
+                                 before.ins[-1].raw)
+                check_vm(functions, hashes, language)
 
     def test_narrow_narration_expands_without_moving_or_other_bytecode_changes(self):
         before_blob = synthetic_dialogue(60)

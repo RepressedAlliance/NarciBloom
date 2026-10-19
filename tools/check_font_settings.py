@@ -6,7 +6,8 @@ from build_font_settings import *
 
 
 class VM:
-    def __init__(self,functions,variables=None,choices=()):
+    def __init__(self,functions,variables=None,choices=(),encoding='gbk'):
+        self.encoding=encoding
         self.functions=functions
         self.variables=dict(variables or {})
         self.variables.setdefault(FONT,'Noto Sans CJK')
@@ -27,7 +28,7 @@ class VM:
             if name=='argcheck':assert len(args)>=len(f['t'])
             elif name=='alloca':pass
             elif name=='ldc.i':stack.append(f['i'])
-            elif name=='ldstr':stack.append(f['s'].rstrip(b'\0').decode('gbk'))
+            elif name=='ldstr':stack.append(f['s'].rstrip(b'\0').decode(self.encoding))
             elif name=='ld':
                 scope=(f['f']>>5)&7
                 if scope==3:
@@ -77,7 +78,8 @@ class VM:
         return self.run(hashed,args)
 
 
-def check_vm(functions,hashes):
+def check_vm(functions,hashes,language='zh-CN'):
+    menu=MENUS[language]
     for size in [0,-100,999,26,*SIZES]:
         vm=VM(functions,{SIZE:size})
         vm.run(hashes['apply'])
@@ -91,7 +93,7 @@ def check_vm(functions,hashes):
         assert vm.operations[-1]==(0x098399F2,['Noto Sans CJK',expected,expected//2])
     if 'init' in hashes:
         for index,size in enumerate(SIZES):
-            vm=VM(functions)
+            vm=VM(functions,encoding=menu['encoding'])
             vm.run(hashes['init'])
             vm.run(hashes['click'],[3100+index,120+100*index,534,88,36])
             assert vm.variables[SIZE]==size
@@ -103,21 +105,21 @@ def check_vm(functions,hashes):
                 assert (y,w,h)==(534,88,36) and x+w<=800 and y+h<=600
                 assert on==hashes['noop'] and off==hashes['noop'] and click==hashes['click']
             text=[args[0] for h,args in vm.operations if h==0x35A89417]
-            assert '当前字号：'+str(size) in text
+            assert menu['heading']+str(size) in text
             for hashed,args in vm.operations:
                 if hashed==0xD01BE374:
                     _,x,y,w,h,_=args
                     assert 0<=x<x+w<=800 and 0<=y<y+h<=600
     else:
         for index,size in enumerate(SIZES):
-            vm=VM(functions,{SIZE:32},choices=[1,index+1,3])
+            vm=VM(functions,{SIZE:32},choices=[1,index+1,3],encoding=menu['encoding'])
             result=vm.menu_run(hashes['selector'],['Noto Sans CJK',0])
             assert result=='Noto Sans CJK' and vm.variables[SIZE]==size
             menus=[args for h,args in vm.operations if h==0x0A7A489C]
             assert len(menus)==3 and len(menus[1])==6
             assert [int(label.split()[0]) for label in menus[1]]==list(SIZES)
             assert str(size) in menus[-1][0]
-        vm=VM(functions,{SIZE:36},choices=[2])
+        vm=VM(functions,{SIZE:36},choices=[2],encoding=menu['encoding'])
         assert vm.menu_run(hashes['selector'],['Noto Sans CJK',0])=='Selected test font'
-        vm=VM(functions,{SIZE:36},choices=[-1])
+        vm=VM(functions,{SIZE:36},choices=[-1],encoding=menu['encoding'])
         assert vm.menu_run(hashes['selector'],['Noto Sans CJK',0])=='Noto Sans CJK'
