@@ -55,21 +55,22 @@ class FontSettingsTests(unittest.TestCase):
                 check_vm(functions, hashes, language)
 
     def test_localized_pause_entry_preserves_following_instructions(self):
-        code = (Builder('cp932').text('フォント設定').text('物語の本文')
-                .integer(0).integer(0).syscall(0x95FF28F2, 2, result=True).op('ret').finish())
-        blob = (struct.pack('<16sIII', b'MajiroObjV1.000\0', 0, 1, 1)
-                + struct.pack('<II', 0x1234, 0) + struct.pack('<I', len(code)) + code)
-        before = Script(blob)
-        for language, menu in MENUS.items():
-            with self.subTest(language=language):
-                patched, _, functions, hashes = patch_pause(blob, language)
-                after = Script(patched)
-                self.assertEqual(after.ins[0].fields['s'].rstrip(b'\0').decode(menu['encoding']), menu['entry'])
-                self.assertEqual(after.ins[1].raw, before.ins[1].raw)
-                self.assertTrue({i.offset for i in before.ins} <= {i.offset for i in after.ins})
-                self.assertEqual(next(i.raw for i in after.ins if i.offset == before.ins[-1].offset),
-                                 before.ins[-1].raw)
-                check_vm(functions, hashes, language)
+        for entry in ['フォント設定', 'Font settings']:
+            code = (Builder('cp932').text(entry).text('物語の本文')
+                    .integer(0).integer(0).syscall(0x95FF28F2, 2, result=True).op('ret').finish())
+            blob = (struct.pack('<16sIII', b'MajiroObjV1.000\0', 0, 1, 1)
+                    + struct.pack('<II', 0x1234, 0) + struct.pack('<I', len(code)) + code)
+            before = Script(blob)
+            for language, menu in MENUS.items():
+                with self.subTest(entry=entry, language=language):
+                    patched, _, functions, hashes = patch_pause(blob, language)
+                    after = Script(patched)
+                    self.assertEqual(after.ins[0].fields['s'].rstrip(b'\0').decode(menu['encoding']), menu['entry'])
+                    self.assertEqual(after.ins[1].raw, before.ins[1].raw)
+                    self.assertTrue({i.offset for i in before.ins} <= {i.offset for i in after.ins})
+                    self.assertEqual(next(i.raw for i in after.ins if i.offset == before.ins[-1].offset),
+                                     before.ins[-1].raw)
+                    check_vm(functions, hashes, language)
 
     def test_narrow_narration_expands_without_moving_or_other_bytecode_changes(self):
         before_blob = synthetic_dialogue(60)

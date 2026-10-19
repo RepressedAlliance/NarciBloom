@@ -297,7 +297,8 @@ def patch_pause(blob, language='zh-CN'):
     assert len(targets)==1
     s.replace_syscall(targets[0],hashes['selector'])
     # Reuse the existing font settings entry; do not move the other controls.
-    labels=[i for i in s.ins if i.name=='ldstr' and i.fields['s'].rstrip(b'\0')=='フォント設定'.encode('cp932')]
+    font_labels={'フォント設定'.encode('cp932'), b'Font settings'}
+    labels=[i for i in s.ins if i.name=='ldstr' and i.fields['s'].rstrip(b'\0') in font_labels]
     assert len(labels)==1
     menu=MENUS[language]
     label=labels[0];raw=menu['entry'].encode(menu['encoding'])+b'\0'
@@ -368,8 +369,8 @@ def original_sources(folder):
     return files,exe,blob,embedded
 
 
-def build(game, language='zh-CN', font_family=None):
-    folder=ROOT/game;files,exe,exe_blob,embedded=original_sources(folder)
+def build_overrides(game, files, language='zh-CN', font_family=None):
+    """Compile local overrides without reading or writing a game directory."""
     override={}
     for name in ['sysdata.cfg','sysdata27.cfg','ナルキ１全画面中央.cfg','プロダクツ用設定.cfg']:
         if name in files:override[name]=config_fonts(files[name],font_family=font_family)
@@ -384,16 +385,23 @@ def build(game, language='zh-CN', font_family=None):
     override.update({setting_script:config,'load_sysdata.mjo':loader,'console.mjo':console})
     # 1+2 virtual files are handled by the separate repair recipe.
     renames=[]
-    dest=OUT/game;dest.mkdir(parents=True,exist_ok=True)
-    (dest/'update12.arc').write_bytes(archive(override))
-    report={'game':game,'source_exe':str(exe),'source_sha256':hashlib.sha256(exe_blob).hexdigest(),
+    report={'game':game,
             'menu_language':language,'menu_encoding':MENUS[language]['encoding'],
             'font_family_override':font_family,
             'override_files':list(override),'config_hooks':hooks,'loader_hooks':load_hooks,
             'text_rectangles':rects,'embedded_directory_renames':renames,
             'font_sizes':SIZES,'default_font_size':DEFAULT,'ui_functions':hashes,
             'settings_script':setting_script,
-            'archive_bytes':(dest/'update12.arc').stat().st_size}
+            'archive_bytes':len(archive(override))}
+    return override,report,new_functions,hashes
+
+
+def build(game, language='zh-CN', font_family=None):
+    folder=ROOT/game;files,exe,exe_blob,embedded=original_sources(folder)
+    override,report,new_functions,hashes=build_overrides(game,files,language,font_family)
+    dest=OUT/game;dest.mkdir(parents=True,exist_ok=True)
+    (dest/'update12.arc').write_bytes(archive(override))
+    report.update(source_exe=str(exe),source_sha256=hashlib.sha256(exe_blob).hexdigest())
     (dest/'manifest.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     return report,new_functions,hashes
 
