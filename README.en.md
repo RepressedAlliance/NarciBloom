@@ -1,18 +1,37 @@
 # NarciBloom
 
-Adjustable text and more comfortable reading for the Steam edition of **Narcissu 10th Anniversary Anthology Project**, with Steam Deck as the first target.
+Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology Project**, with Steam Deck as the first target.
 
-**Developer preview — no end-user installer yet.** The current implementation covers Japanese stock inputs and a specific Simplified Chinese translation build. Other editions and translations are unverified. Build the appropriate variant for each loader; generated archives are not interchangeable.
+**Developer preview.** Choose the Windows or SteamOS package from [GitHub Releases](https://github.com/RepressedAlliance/NarciBloom/releases). Targeted checks cover building, installing, restoring and short game scenes; full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
 
-- Six in-game font presets: 24, 28, 32, 36, 40 and 44.
-- Current-size indicators and persistent settings.
-- A taller narration area in 1+2, preventing larger text from clearing the preceding line on every line break.
-- Font-dialog caption fixes for the tested translation build.
+- Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
+- Persistent size settings and an optional existing local font family; no font installation or system-locale change.
+- Native font-dialog and menu caption fixes. Some native controls use short English labels; the story language is preserved.
+- Additional page breaks when a long paragraph exceeds the active text area, without moving the artwork or reducing the selected size.
 
-On Steam Deck with Proton 7.0, the Chinese 1+2 selector and multiline text at 44 (1st) and 36 (2nd) have been checked. Limited Windows checks and input identifiers are recorded in the [compatibility notes](docs/COMPATIBILITY.md) and [version records](docs/VERSIONS.md). Full-story coverage remains unverified.
+## Two packages, one font core
 
-See the [Chinese README](README.md), [compatibility notes](docs/COMPATIBILITY.md), and [developer instructions](docs/DEVELOPMENT.md).
+| Package | Purpose |
+|---|---|
+| **Fonts** | Keep the story language of a recognized Japanese, English or supported Simplified Chinese installation and add font controls. |
+| **Chinese** | Include 风铃汉化组's unchanged PC v1.1 RAR and the same font core. The installer generates the adapted files locally from that archive and your own Steam game. |
 
-This repository contains source code, documentation and demonstration screenshots. It does not include game executables, translated scenario files, archives, audio, saves or an entire game distribution. Build from your own supported game installation. Generated files stay local.
+Only the recorded Steam anthology versions and PC v1.1 Chinese translation are recognized. Other editions, translation builds and the separate free *Narcissu 1st & 2nd* release are outside this scope. The installer lists stories actually installed on your machine; it does not download the game or DLC.
 
-Original project code: [MIT](LICENSE). Dependencies and game content have separate ownership and license terms; see [THIRD_PARTY.md](THIRD_PARTY.md).
+Translation: **风铃汉化组**. Font features and platform adaptation: **NarciBloom**. Preserve the original translation notices and release link; the Chinese package is free and does not contain the game itself. The [translation-source notes](docs/TRANSLATION.md) explain redistribution conditions and their remaining limits.
+
+## Trying a local preview
+
+Close the game, extract the complete package, then open its native launcher: `NarciBloom.exe` / `NarciBloomChinese.exe` on Windows, or `NarciBloom` / `NarciBloomChinese` in SteamOS desktop mode. The SteamOS installer runs natively; the game continues to launch through Steam with its configured compatibility layer.
+
+Check the anthology's game root folder, select the supported stories you own, and choose **Install / Update**. The Chinese launcher detects its accompanying original RAR, or lets you select it. **Uninstall & Restore** uses the originals retained in the game's `.narcibloom` folder; keep that folder. Later changes by Steam or another mod are reported as conflicts instead of silently overwritten. Personal saves are protected. See the [installation and recovery guide](docs/INSTALLATION.md).
+
+In 1+2, open the pause menu → Options → Font / Size. The other stories add size buttons to their existing settings page. Image-based labels do not scale with story text.
+
+During an added page break, settings and history are temporarily unavailable to protect pending text. They become available at the game's next natural paragraph pause. Saving at an added page break resumes from the previous native checkpoint, so some text may need to be reread. Main-window titles can still be garbled on Chinese Windows; the checked story text, size controls and fixed exit prompts are readable. These are preview limitations, not full-story compatibility guarantees.
+
+For feedback, include the story and scene, size, game/translation version, OS and Proton version where applicable. Avoid spoilers, personal paths, save uploads and complete game files.
+
+Developers: [setup, APIs and native package builds](docs/DEVELOPMENT.md), [input profiles](docs/source-profiles.json), [version records](docs/VERSIONS.md). Also available: [中文说明](README.md).
+
+Original project code is [MIT licensed](LICENSE). Game and translation content retain their separate ownership; dependency notices are in [THIRD_PARTY.md](THIRD_PARTY.md). This is an independent, unofficial project.

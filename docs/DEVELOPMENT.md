@@ -1,18 +1,10 @@
 # 开发与构建
 
-当前提供的是维护者构建流程。**只生成中间产物，不安装游戏；不要直接把 `staged/` 全部覆盖进游戏。**
+Python 3.12 为当前开发与自动检查目标，SteamOS 本机构建另使用 Python 3.13。源码包含图形安装器、版本识别、安装／更新／卸载及原文件恢复；玩家包属于开发预览，尚未全篇验收。高级构建器只生成本地产物，GUI 中的「安装 / 更新」才会写入选定游戏。请在独立副本中做开发测试，保留个人进度。
 
-## 目录
+## 环境与检查
 
-```text
-tools/                  资源包、脚本与 1＋2 汉化适配逻辑
-tests/                  不依赖游戏文件的检查
-docs/                   兼容性、研究记录与后续计划
-.deps/                  本地工具依赖（不提交）
-work/                   本地源文件、构建结果（不提交）
-```
-
-Python 3.12 为当前开发与自动检查目标。
+建议使用独立 Python 环境，在仓库根目录执行：
 
 ```sh
 python tools/bootstrap.py
@@ -20,90 +12,97 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-`bootstrap.py` 获取固定提交的 majiro-py 源码及许可文件。构建阶段需要 pefile，1＋2 虚拟文件提取另需 evbunpack。
+`bootstrap.py` 下载固定提交的 majiro-py 源码和许可至 `.deps/majiro-py/`；其他运行依赖在 `requirements.txt` 固定。`tests/` 使用合成资源与模拟接口，不附带游戏脚本。游戏相关的构建、启动和场景检查分别记录在 [COMPATIBILITY.md](COMPATIBILITY.md)，单元测试通过不代表全篇游玩通过。
 
-## 本地路径
+目录用途：`tools/` 为实现，`docs/` 为说明及来源元数据，`.deps/` 为本地依赖，`work/`、`build/`、`dist/` 为被忽略的本地输入和产物。游戏 EXE、DLL、完整 ARC、翻译表、存档及安装记录都不能提交。
 
-Linux / Steam Deck：
+## 从源码运行安装器
+
+Python 环境须有 `tkinter` 及对应 Tcl/Tk。启动共享 GUI：
 
 ```sh
-export NARCIBLOOM_GAME_DIR="/path/to/Narcissu 10th Anniversary Anthology Project"
-export NARCIBLOOM_WORK_DIR="$PWD/work"
+python tools/app.py
+python tools/app.py --mode chinese --language zh
 ```
 
-Windows PowerShell：
+可用 `--game-dir ./work/my-anthology` 预填游戏根目录。界面支持 `ja`、`en`、`zh`；界面语言不改变剧情语言。字体模式保留识别到的日文／英文／受支持中文输入，中文模式读取玩家提供的风铃汉化组 PC v1.1 原始 RAR，再用同一字体核心在本地生成适配文件。源码 GUI 的中文模式通过「选择 RAR」指定原包；分发包可自动发现启动程序旁的同名原包。
+
+Windows RAR 读取使用系统 `tar.exe`；Linux／SteamOS 使用系统 `libarchive`。Linux 图形会话还须能运行 Tk，并具备相容的图形和字体运行库。字体自动选择会查询 Windows 字体注册表或 `fc-list`，也可手动指定本机已有字体；安装器不安装字体、不更改系统区域。
+
+Windows 和 SteamOS 使用各自的原生入口。SteamOS 安装器在桌面模式运行，安装完成后仍通过 Steam 原入口启动游戏；安装器不需要放进 Proton 前缀。实际安装、冲突与恢复操作见 [INSTALLATION.md](INSTALLATION.md)。
+
+## 版本识别与安装接口
+
+- `docs/source-profiles.json`：五模块日文／英文原版的 EXE 与相关脚本、配置指纹。
+- `docs/translation-source.json`：PC v1.1 RAR、五个成员 EXE 与原说明的指纹、署名及出处。它用于匹配已记录输入，不提供发布者真实性或安全性保证。
+- `installer_app_backend.scan_game(path)` 返回实际安装的模块及其支持状态；未知或相关资源已修改的输入会被拒绝。
+- `run_install(game_dir, modules, chinese=False, font_family=None, translation_archive=None)` 与 `run_uninstall(game_dir)` 是 GUI 共用的安装接口。`modules` 是本次希望保留安装的完整故事集合；取消先前已安装故事会恢复它。
+
+上述接口从 `tools/installer_app_backend.py` 导入，开发调用时将 `tools/` 加入 Python 模块路径。后台构建以 `.narcibloom` 中保留的原始输入为基础，避免重复修补当前产物；写入前检查游戏进程，安装管理器记录备份、文件指纹和事务。未知外部覆盖、后续 Steam／用户修改、未完成事务的恢复冲突均应停止并保留现场，不能通过删除记录或放宽识别绕过。
+
+`.narcibloom` 含本地原文件及恢复资料，不能随反馈或发布包上传。卸载恢复原文件并处理自身新增文件，个人存档与受保护设置不在写入范围。
+
+## 字体核心与中文适配
+
+`build_font_settings.build_overrides(game, files, language, font_family)` 接收已经展开、按优先级合并的有效资源映射，返回覆盖文件和构建信息。新增菜单使用 `ja` 的 CP932、`en` 的 ASCII，或中文加载器对应的映射；选择英文新增菜单不翻译日文剧情。GUI 依据实际输入选择菜单语言，而不是要求玩家猜测编码。
+
+`chinese_builder.build_chinese_payload(game, packed_exe_bytes, stock_files, font_family)` 返回 `ChineseBuild(payload, executable, report)`。它在内存中读取原汉化的虚拟文件并恢复 PE，合并原版资源、汉化 ARC 和优先的 `#mjo/` 脚本；修改后的脚本同时保持松散覆盖与新 ARC 一致。每张译文表单独识别编码，新增 UI 按该版本 DLL 的记录规则接入。不要把仅有 `update12.arc` 的原版产物当作完整中文适配。
+
+该路径不执行输入 EXE／DLL，不修改剧情表；原包和汉化信息保留，变更后的汉化产物只在玩家电脑生成。旧 `repair_onetwo_virtual_files.py` 是特定历史输入的研究配方，不是通用 v1.1 安装流程。来源与分发边界见 [TRANSLATION.md](TRANSLATION.md)、[THIRD_PARTY.md](../THIRD_PARTY.md)。
+
+原生字体／菜单／固定确认提示的部分字段使用简短 ASCII，避免与 ANSI 加载器编码冲突。中文菜单与已抽样正文不因此改成英文；部分主窗口标题仍可能乱码，不能靠更改系统区域或盲目覆盖标题钩子掩盖。
+
+`layout_candidate.py` 按有效 console 边界插入等待，保留原打字事件；新增等待不创建原生存档点，并暂时保护设置／历史记录入口。插入页内保存会回到前一个原生停顿点，不能精确恢复该页。当前为预览实现，实机场景和合成长段结果见兼容性记录，不构成全篇与所有演出的保证。
+
+## 高级：仅生成原版覆盖资源
+
+维护者可直接使用 `build_font_settings.py`。此入口读取指定副本并生成 `work/staged/<模块>/update12.arc` 与构建报告，不执行安装器版本识别或恢复事务，也不改源游戏。它不能替代完整的中文构建和原生窗口修正。
+
+Linux 示例：
+
+```sh
+export NARCIBLOOM_GAME_DIR="./work/my-anthology"
+export NARCIBLOOM_WORK_DIR="./work"
+python tools/build_font_settings.py --game narci_onetwo --menu-language en
+```
+
+PowerShell 7 示例：
 
 ```powershell
-$env:NARCIBLOOM_GAME_DIR = 'D:\Games\Narcissu 10th Anniversary Anthology Project'
+$env:NARCIBLOOM_GAME_DIR = (Resolve-Path './work/my-anthology').Path
 $env:NARCIBLOOM_WORK_DIR = Join-Path (Get-Location) 'work'
+python tools/build_font_settings.py --game narci_iris --menu-language ja --font-family 'UD Digi Kyokasho N'
 ```
 
-仅指向自有游戏的受支持原始版本。当前流程不负责识别已安装其他修改的版本，也不应使用自己的已修改游戏反复覆盖生成新的基线。
+`--font-family` 仅选择已经安装且适合文本语言的字体；高级构建器省略此项时保留源配置字体，而 GUI 留空时会自动选择。`--game` 可重复指定；模块 ID 为 `narci_onetwo`、`narci_himeko`、`narci_iris`、`narci_zero`、`narci_sumire`。只使用已确认的受支持输入，不混用语言和加载器产物，不使用 `python -O` 绕过结构检查。
 
-## 原版与汉化的构建选择
+## 构建原生预览包
 
-字号、持久设置和文本区修正共用实现，新增菜单文字按目标加载器编码：
-
-- 日文原版：加 `--menu-language ja`，使用 CP932 日文菜单，不需要汉化 DLL 或虚拟文件提取。
-- 希望在日文原版中使用英文的新增菜单：加 `--menu-language en`，使用 CP932 的 ASCII 子集。此选项不翻译剧情，也不代表 Steam 英文发行文件已适配。
-- 现有汉化：默认 `--menu-language zh-CN`，保持原有 GBK 菜单生成；1＋2 还必须执行下文的汉化虚拟文件步骤。
-
-中文 Windows 上的 Iris 曾在原版默认字体下同时出现正文和动态菜单乱码，停用字体补丁后仍可复现。在游戏设置的字体选择框中选用电脑已有的日文字体 `UD Digi Kyokasho N` 后，原版正文恢复。先确认原版使用的字体能正常显示日文，再检查新增菜单；`en` 可让新增菜单避免非 ASCII 字形问题，但不解决正文乱码。无需修改系统区域；其他模块的字体环境仍待分别实测。
-
-需要指定已安装的默认字体时，可额外使用 `--font-family`。它只改构建配置中的正文和角色名字体，不安装字体，也不改变系统设置；省略时保留源文件的字体。不要为汉化版盲目选用只适合日文的字体。例如：
+在对应平台的 x64 构建主机上安装打包依赖：
 
 ```sh
-python tools/build_font_settings.py --game narci_iris --menu-language ja --font-family "UD Digi Kyokasho N"
+python tools/bootstrap.py
+python -m pip install -r requirements-build.txt
+python -m unittest discover -s tests -v
+python tools/build_release.py --output dist/my-preview
 ```
 
-例如日文原版 1＋2：
+`requirements-build.txt` 包含运行依赖及固定版本的 PyInstaller 工具链。输出目录必须为空或尚不存在，已有输出会保留。Windows 主机构建 Windows 原生 `.exe` 包；Linux 主机构建 SteamOS／Linux 原生程序。两个平台都生成带平台名的 Fonts ZIP、`SHA256SUMS.txt` 与 `artifacts.json`；当前版本取自安装后台的 `VERSION`。
+
+构建中文包时提供自己的原始 v1.1 RAR：
 
 ```sh
-python tools/build_font_settings.py --game narci_onetwo --menu-language ja
+python tools/build_release.py --output dist/my-preview-cn --translation-archive './work/N10 ver1.1补丁.rar'
 ```
 
-输出仍仅在工作目录。原版 1＋2 的构建结果包含完整的七项覆盖资源，不运行 `repair_onetwo_virtual_files.py`；后者专用于已测试的汉化。开发者可在独立游戏副本中放入对应 `update12.arc` 做运行检查。不要混用不同语言的构建输出，游戏运行时不要替换文件。
-
-工具尚未自动识别版本或处理安装顺序：安装、更换汉化后必须重新从对应输入构建，不能假定先装字体补丁后覆盖汉化仍然有效。文件标识和当前已确认输入见 [VERSIONS.md](VERSIONS.md)。
-
-## 四个后日谈/附加篇章
-
-例如构建 Iris：
+此命令生成 Fonts 和 Chinese 两种 ZIP。Chinese 包原样附带 RAR，将入口命名为 `NarciBloomChinese.exe` 或 `NarciBloomChinese`，仍在安装时本地转换。也可向已有 Fonts 包添加原 RAR，不重新构建其原生入口：
 
 ```sh
-python tools/build_font_settings.py --game narci_iris
+python tools/build_release.py --output dist/my-bundle --bundle-existing './dist/my-preview/NarciBloom-<version>-<platform>-Fonts.zip' --translation-archive './work/N10 ver1.1补丁.rar'
 ```
 
-也可用 `--game narci_himeko`、`--game narci_zero`、`--game narci_sumire`，或重复传入多个 `--game`。输出位于工作目录的 `staged/<模块>/`，包括 `update12.arc` 与本地构建信息。游戏源文件仅被读取。
+打包不读取游戏安装目录，也不应把游戏、存档、生成后的汉化程序或 `.narcibloom` 装进 ZIP。构建会收集第三方许可，并联网获取所用 CPython／Tcl／OpenSSL／zlib 的对应声明；缺失或无法解释的 Linux 原生依赖来源会让构建停止，需核对报告。`build-info.json` 记录源码提交、是否有未提交修改及构建工具版本；正式候选应从干净提交构建并保留这些标识。
 
-## 1＋2：必须完成虚拟文件适配
+Linux 包依赖主机提供一部分图形、字体及归档共享库，并非面向任意发行版的全静态程序。所需共享库及 GLIBC 下限应依据该次构建的实际产物、构建主机和目标机检查（例如 `ldd`、`readelf --version-info`）；不能仅凭 ZIP 名称承诺通用兼容。发布时保留 `licenses/` 及其运行时来源报告。
 
-原汉化使用 Enigma Virtual Box，外部资源包可能被其虚拟脚本覆盖，因此不能只构建一个外部 `update12.arc` 后就视为有效。
-
-1. 用受支持汉化的原始游戏文件准备基础构建：
-
-   ```sh
-   python tools/build_font_settings.py --game narci_onetwo
-   ```
-
-2. 将同一版本的原始汉化程序解包到工作目录的 `unpacked-onetwo/`。下面以默认工作目录为例：
-
-   ```sh
-   python -m evbunpack -pe 9_70 "/path/to/original/narci_onetwo.exe" "work/unpacked-onetwo"
-   ```
-
-3. 检查输出中确实有原始程序、`#mjo/`、`#txt/`、`FontPatch.dll`、`Narcissu_cn.dll`，再运行：
-
-   ```sh
-   python tools/repair_onetwo_virtual_files.py
-   ```
-
-4. 修正后的本地产物位于工作目录的 `repair-onetwo/`，**不是第一步的 `staged/narci_onetwo/`**。报告为 `repair-onetwo-report.json`。这一目录包含从自有游戏提取的内容，不能提交到源码仓库。
-
-上述构建配方保留实际使用的汉化脚本，新增的菜单文字通过对应翻译表接入，并修正字幕区域及 DLL 窗口标题替换。结构不符时的断言失败表示需要重新适配，不能使用 `python -O` 绕过检查。
-
-## 当前检查与后续安装器
-
-测试会解释执行生成的辅助函数，检查各字号、菜单选项及控件范围；文本区测试使用人工构造的最小脚本，不附带游戏脚本。实际游戏验证另行记录在兼容性文档中。
-
-尚待完成的安装器应支持：发现 Steam 游戏目录、识别游戏/汉化版本、检查游戏已退出、按安装记录更新或恢复。现阶段没有自动安装或远程部署命令。
+`.github/workflows/packages.yml` 提供手动触发的两平台 Fonts 包构建；工作流产物不等于已经发布或完成游戏验收。公开发布前仍需核对原生启动、安装／更新／卸载、依赖声明及相应平台的游戏场景结果。
