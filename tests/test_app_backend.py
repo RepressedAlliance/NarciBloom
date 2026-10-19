@@ -1,6 +1,7 @@
 """Backend integration with synthetic archives and an artificial payload builder."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -46,12 +47,12 @@ class BackendTests(unittest.TestCase):
             target.start()
             self.addCleanup(target.stop)
 
-    def add_story(self, module="narci_onetwo", language="ja"):
+    def add_story(self, module="narci_onetwo", language="ja", executable_name=None):
         executable = f"synthetic-executable:{module}:{language}".encode()
         files = {"config.mjo": f"synthetic-config:{module}:{language}".encode(),
                  "sysdata.cfg": b"synthetic-font-configuration"}
         arc = archive(files)
-        put(self.game, f"{module}/{module}.exe", executable)
+        put(self.game, f"{module}/{executable_name or module + '.exe'}", executable)
         put(self.game, f"{module}/scenario.arc", arc)
         self.originals[module] = (executable, arc)
         self.profiles.append({"module": module, "language": language, "exe_sha256": digest(executable),
@@ -186,6 +187,59 @@ class BackendTests(unittest.TestCase):
         backend.run_install(self.game, ["narci_onetwo"])
         self.assertEqual(self.manager().read_record()["version"], backend.VERSION)
         self.assertTrue(backend.scan_game(self.game)["modules"][0]["supported"])
+
+    def test_capitalized_steam_executable_keeps_one_name_through_both_products(self):
+        module = "narci_himeko"
+        relative = f"{module}/Narci_himeko.exe"
+        self.add_story(module, executable_name="Narci_himeko.exe")
+        save = put(self.game, f"{module}/save_chs/slot.dat", b"progress")
+        self.assertTrue(backend.scan_game(self.game)["modules"][0]["supported"])
+        with patch.object(backend, "_prepare_native_engine", return_value=(b"font-engine", {})):
+            backend.run_install(self.game, [module])
+            backend.run_install(self.game, [module])
+        self.assertIn(relative, self.manager().read_record()["files"])
+        self.assertEqual(self.manager().original_file(f"{module}/{module}.exe"), self.originals[module][0])
+        fake = types.SimpleNamespace(build_chinese_payload=lambda *args, **kwargs:
+             types.SimpleNamespace(payload={"#mjo/config.mjo": b"chinese"},
+                                   executable=b"chinese-engine", report={}))
+        package = {f"{module}/Narci_himeko.exe": b"packed", "readme.txt": b"attribution"}
+        with patch.dict(sys.modules, {"chinese_builder": fake}), patch.object(backend, "read_package", return_value=package):
+            backend.run_install(self.game, [module], chinese=True, translation_archive="original.rar")
+            backend.run_install(self.game, [module], chinese=False)
+        self.assertEqual((self.game / relative).read_bytes(), b"chinese-engine")
+        self.assertEqual([p.name for p in (self.game / module).iterdir()
+                          if p.suffix.casefold() == '.exe'], ["Narci_himeko.exe"])
+        backend.run_uninstall(self.game)
+        self.assertEqual((self.game / relative).read_bytes(), self.originals[module][0])
+        self.assertEqual(save.read_bytes(), b"progress")
+
+    @unittest.skipUnless(os.name == 'nt', 'Legacy case-insensitive Windows record')
+    def test_legacy_lowercase_windows_record_keeps_actual_capitalized_filename(self):
+        module = "narci_himeko"
+        actual, legacy = f"{module}/Narci_himeko.exe", f"{module}/{module}.exe"
+        self.add_story(module, executable_name="Narci_himeko.exe")
+        backend.run_install(self.game, [module])
+        record = self.manager().read_record()
+        record['files'][legacy] = record['files'].pop(actual)
+        (self.manager().state / 'record.json').write_text(json.dumps(record))
+        with patch.object(backend, '_prepare_native_engine', return_value=(b'new-engine', {})):
+            backend.run_install(self.game, [module])
+        self.assertIn(legacy, self.manager().read_record()['files'])
+        self.assertNotIn(actual, self.manager().read_record()['files'])
+        self.assertIn('Narci_himeko.exe', [p.name for p in (self.game / module).iterdir()])
+        backend.run_uninstall(self.game)
+        self.assertEqual((self.game / actual).read_bytes(), self.originals[module][0])
+
+    def test_case_distinct_duplicate_executables_are_rejected_before_building(self):
+        self.add_story('narci_himeko', executable_name='Narci_himeko.exe')
+        put(self.game, 'narci_himeko/narci_himeko.exe', b'different')
+        if len(list((self.game / 'narci_himeko').glob('*.exe'))) != 2:
+            self.skipTest('Filesystem does not permit case-distinct names')
+        with self.assertRaisesRegex(ValueError, 'Ambiguous story executable'):
+            backend.scan_game(self.game)
+        with self.assertRaisesRegex(ValueError, 'Ambiguous story executable'):
+            backend.run_install(self.game, ['narci_himeko'])
+        self.assertEqual(self.builds, [])
 
 
 if __name__ == "__main__":

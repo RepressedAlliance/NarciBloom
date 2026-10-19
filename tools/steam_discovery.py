@@ -106,7 +106,12 @@ def inspect_game(game_dir: str | Path, manifest_path: str | Path | None = None) 
         folder = root / module_id
         if folder.is_symlink() or getattr(folder, "is_junction", lambda: False)():
             continue
-        exe = folder / f"{module_id}.exe"
+        matches = ([path for path in folder.iterdir()
+                    if path.name.casefold() == f"{module_id}.exe"] if folder.is_dir() else [])
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous story executable names in {module_id}: "
+                             + ", ".join(sorted(path.name for path in matches)))
+        exe = matches[0] if matches else folder / f"{module_id}.exe"
         archives = sorted(p for p in folder.glob("*.arc") if _regular(p))
         if _regular(exe) and archives:
             modules.append(StoryInstallation(module_id, title, folder, exe,

@@ -82,6 +82,16 @@ def _safe_path(root: Path, relative: str) -> Path:
     if _is_link(root):
         raise PathSafetyError(f"Linked directory is not an installation target: {root}")
     for component in PurePosixPath(relative).parts:
+        if current.is_dir():
+            matches = [path for path in current.iterdir() if path.name.casefold() == component.casefold()]
+            if len(matches) > 1:
+                raise PathSafetyError(f"Case-colliding installation paths: {current / component}")
+            if matches and matches[0].name != component:
+                if os.name != "nt":
+                    raise PathSafetyError(f"Existing path has different case: {current / component}")
+                # Old Windows records may use lowercase while Steam's actual
+                # filename retained capitals. Keep both the record and disk name.
+                component = matches[0].name
         current = current / component
         if _is_link(current):
             raise PathSafetyError(f"Linked/reparse path is not allowed: {current}")

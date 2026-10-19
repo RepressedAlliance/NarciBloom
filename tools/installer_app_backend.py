@@ -33,14 +33,20 @@ def _translation_hashes():
             for item in source_notice()['input_fingerprint']['members'] if item['path'].endswith('.exe')}
 
 
-def _baseline(manager, module):
+def _executable_relative(manager, story, record):
+    actual = story.executable.relative_to(manager.game_dir).as_posix()
+    return next((name for name in (record or {}).get('files', {})
+                 if name.casefold() == actual.casefold()), actual)
+
+
+def _baseline(manager, module, executable_relative):
     """Read only code/config source archives; large media archives are irrelevant."""
     files = {}
     for name in ARCHIVES:
         blob = manager.original_file(f'{module}/{name}')
         if blob is not None:
             files.update({name: value[2] for name, value in entries(blob).items()})
-    executable = manager.original_file(f'{module}/{module}.exe')
+    executable = manager.original_file(executable_relative)
     if executable is None:
         raise InstallError(f'Missing story executable: {module}')
     for match in re.finditer(rb'MajiroArcV[13]\.000\x00', executable):
@@ -110,7 +116,7 @@ def scan_game(path):
                                 'supported': True, 'reason': 'An interrupted operation will be recovered before installation.'})
                 continue
             _check_external_overrides(manager, module.id)
-            executable, files = _baseline(manager, module.id)
+            executable, files = _baseline(manager, module.id, _executable_relative(manager, module, record))
             language = _recognize(module.id, executable, files)
             language = prior.get(module.id, {}).get('language', language)
         except (ValueError, AssertionError, OSError, InstallError, struct.error, IndexError) as exc:
@@ -168,11 +174,12 @@ def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
     if not chosen or set(chosen) - set(game.module_ids):
         raise InstallError('Select at least one locally installed story')
     record = manager.read_record() or {'files': {}, 'metadata': {}}
+    executables = {story.id: _executable_relative(manager, story, record) for story in game.modules}
     prior = record['metadata'].get('stories', {})
     # The selection is the complete desired set: deselected previously managed
     # stories are restored by InstallManager as part of the same transaction.
     needs_archive = chinese or any(prior.get(module, {}).get('language') == 'zh-CN'
-                                  and _sha(manager.original_file(f'{module}/{module}.exe') or b'')
+                                  and _sha(manager.original_file(executables[module]) or b'')
                                       != _translation_hashes().get(module) for module in chosen)
     package = None
     if needs_archive:
@@ -185,7 +192,8 @@ def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
     for module in chosen:
         progress(f'Building {module}…')
         _check_external_overrides(manager, module)
-        executable, files = _baseline(manager, module)
+        executable_relative = executables[module]
+        executable, files = _baseline(manager, module, executable_relative)
         language = _recognize(module, executable, files)
         use_chinese = chinese or language == 'zh-CN' or prior.get(module, {}).get('language') == 'zh-CN'
         language = 'zh-CN' if use_chinese else language
@@ -197,11 +205,15 @@ def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
                 # already installed by the player, without an external archive.
                 packed = executable
             else:
-                member = next(name for name in package if name.startswith(module + '/') and name.endswith('.exe'))
+                members = [name for name in package if name.split('/')[0].casefold() == module
+                           and name.casefold().endswith('.exe')]
+                if len(members) != 1:
+                    raise InstallError(f'Expected one translation executable for {module}')
+                member = members[0]
                 packed = package[member]
             built = build_chinese_payload(module, packed, files, font_family=family)
             generated = dict(built.payload)
-            generated[f'{module}.exe'] = built.executable
+            generated[Path(executable_relative).name] = built.executable
             report = built.report
             if package:
                 generated['NarciBloom-translation-readme.txt'] = package['readme.txt']
@@ -209,7 +221,7 @@ def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
             override, report, _, _ = build_overrides(module, files, language, family)
             generated = {'update12.arc': archive(override)}
             engine, native_report = _prepare_native_engine(executable)
-            generated[f'{module}.exe'] = engine
+            generated[Path(executable_relative).name] = engine
             report.update(native_report)
         for name, data in generated.items():
             payload[f'{module}/{name}'] = data

@@ -1,6 +1,7 @@
 """Installer lifecycle tests use synthetic local files, never game resources."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -82,6 +83,41 @@ class InstallerTests(unittest.TestCase):
         for invalid in ["../outside", "narci_onetwo/save_chs/slot.dat"]:
             with self.assertRaises(PathSafetyError):
                 self.manager.original_file(invalid)
+
+    def test_target_executable_case_is_preserved_and_alias_creation_is_refused_on_linux(self):
+        put(self.game, 'narci_himeko/Narci_himeko.exe', b'original')
+        put(self.game, 'narci_himeko/scenario.arc', b'archive')
+        actual = 'narci_himeko/Narci_himeko.exe'
+        alias = 'narci_himeko/narci_himeko.exe'
+        put(self.payload, alias, b'patch')
+        if os.name != 'nt':
+            with self.assertRaises(PathSafetyError):
+                self.manager.install(self.payload, [alias], version='v1')
+            self.assertEqual((self.game / actual).read_bytes(), b'original')
+            (self.payload / alias).unlink()
+        else:
+            self.manager.install(self.payload, [alias], version='legacy')
+            self.assertIn('Narci_himeko.exe', [p.name for p in (self.game / 'narci_himeko').iterdir()])
+            self.manager.uninstall()
+        put(self.payload, actual, b'patch')
+        self.manager.install(self.payload, [actual], version='v2')
+        self.assertEqual(inspect_game(self.game).modules[1].executable.name, 'Narci_himeko.exe')
+        self.manager.uninstall()
+        self.assertEqual((self.game / actual).read_bytes(), b'original')
+
+    def test_renamed_managed_executable_on_case_sensitive_filesystem_is_a_conflict(self):
+        if os.name == 'nt':
+            self.skipTest('Case-sensitive rename conflict is Linux-specific')
+        actual = 'narci_himeko/Narci_himeko.exe'
+        renamed = 'narci_himeko/narci_himeko.exe'
+        put(self.game, actual, b'original')
+        put(self.game, 'narci_himeko/scenario.arc', b'archive')
+        put(self.payload, actual, b'patch')
+        self.manager.install(self.payload, [actual], version='v1')
+        (self.game / actual).rename(self.game / renamed)
+        with self.assertRaises(InstallError):
+            self.manager.uninstall()
+        self.assertEqual((self.game / renamed).read_bytes(), b'patch')
 
     def test_metadata_update_and_identical_payload_do_not_rewrite_game_files(self):
         record = self.install()
