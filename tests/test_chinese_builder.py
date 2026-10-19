@@ -64,6 +64,14 @@ class ChineseBuilderTests(unittest.TestCase):
         self.assertEqual(table.decode('utf-16').splitlines(), ['音量', '速度', '返回', '字号：'])
         self.assertEqual(report['existing_records'], 2)
 
+    def test_loader_skips_ascii_prefixed_japanese_and_keeps_repeated_markers(self):
+        original = ui_script(' / 音量 : ', '[ config.cfg ]パラメータ', '文字速度 : ', '文字速度 : ')
+        result, table, report = chinese.prepare_menu_translation(original, add_menu(original))
+        self.assertEqual(table.decode('utf-16').splitlines(), ['文字速度 : ', '文字速度 : ', '返回', '字号：'])
+        self.assertEqual(report['existing_records'], 2)
+        self.assertEqual(len(chinese._loader_literals(Script(result))), 4)
+        self.assertEqual(Script(result).code[:len(Script(original).code)], Script(original).code)
+
     def test_rejects_mismatched_ui_table_and_story_text(self):
         original = ui_script('設定')
         with self.assertRaisesRegex(ValueError, 'count'):

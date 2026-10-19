@@ -49,6 +49,14 @@ def _nonascii_literals(script):
     return [i for i in script.ins if i.name == 'ldstr' and any(c >= 128 for c in i.fields['s'])]
 
 
+def _loader_literals(script):
+    # All five pinned v1.1 Narcissu_cn DLLs use `cmp byte ptr [eax], 0x81;
+    # jb ...` when collecting ldstr translations. ASCII-prefixed error strings
+    # containing Japanese later in the literal do not consume a table record.
+    return [i for i in script.ins if i.name == 'ldstr' and i.fields['s']
+            and i.fields['s'][0] >= 0x81]
+
+
 def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, replacements=None):
     """Retain CP932 loader markers and append one translation per new ldstr.
 
@@ -59,7 +67,7 @@ def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, re
     original, prepared = Script(original_blob), Script(patched_blob)
     if any(i.name == 'text' for i in original.ins):
         raise ValueError('dialogue translation tables must not be rewritten as UI tables')
-    originals = _nonascii_literals(original)
+    originals = _loader_literals(original)
     replacements = replacements or {}
     if table_blob is None:
         translated = [i.fields['s'].rstrip(b'\0').decode('cp932') for i in originals]
@@ -88,7 +96,7 @@ def prepare_menu_translation(original_blob, patched_blob, table_blob=None, *, re
         prepared.code[item.offset + 4:item.offset + len(item.raw)] = marker
     translated.extend(added)
     result = prepared.finish()
-    if len(_nonascii_literals(Script(result))) != len(translated):
+    if len(_loader_literals(Script(result))) != len(translated):
         raise ValueError('generated UI translation table is not aligned')
     return result, _encode_table(translated, encoding), {
         'encoding': encoding, 'existing_records': len(originals), 'added_records': len(added),
