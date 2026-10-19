@@ -152,6 +152,11 @@ def running_game_processes(game_dir: Path) -> list[str]:
     """
     names = {f"{module}.exe" for module in STORY_TITLES}
     names.update(path.name.casefold() for path in game_dir.glob("*.exe"))
+    for module in STORY_TITLES:
+        folder = game_dir / module
+        if folder.is_dir():
+            names.update(path.name.casefold() for path in folder.iterdir()
+                         if path.suffix.casefold() == ".exe" and path.is_file())
     if os.name == "nt":
         result = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True,
                                 text=True, errors="replace", check=True,

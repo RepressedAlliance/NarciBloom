@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import patch
 
@@ -183,6 +184,37 @@ class InstallerTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 self.manager.uninstall()
         self.assertEqual((self.game / self.path).read_bytes(), b"font-patch")
+
+    def test_windows_process_check_includes_installed_translation_executable_names(self):
+        put(self.game, "narci_onetwo/narci_onetwo_cn.exe", b"translation")
+        put(self.game, "narci_zero/narci_zero_cn_.EXE", b"translation")
+        result = types.SimpleNamespace(stdout='"narci_onetwo_cn.exe","101"\n"NARCI_ZERO_CN_.EXE","102"\n"Steam.exe","103"\n')
+        fake_os = types.SimpleNamespace(name="nt")
+        with patch.object(im, "os", fake_os), patch.object(im.subprocess, "CREATE_NO_WINDOW", 0, create=True), \
+                patch.object(im.subprocess, "run", return_value=result):
+            processes = im.running_game_processes(self.game)
+        self.assertEqual(processes, ["narci_onetwo_cn.exe (PID 101)", "NARCI_ZERO_CN_.EXE (PID 102)"])
+
+    def test_linux_process_check_includes_wine_translation_paths_and_preserves_same_name_policy(self):
+        put(self.game, "narci_onetwo/narci_onetwo_cn.exe", b"translation")
+        put(self.game, "narci_zero/narci_zero_cn_.exe", b"translation")
+
+        class Process:
+            def __init__(self, pid, command):
+                self.name, self.command = str(pid), command
+
+            def __truediv__(self, component):
+                self_component = self
+                return types.SimpleNamespace(read_bytes=lambda: self_component.command)
+
+        proc = types.SimpleNamespace(is_dir=lambda: True, iterdir=lambda: iter([
+            Process(201, b"wine\0Z:\\other-copy\\narci_onetwo_cn.exe\0"),
+            Process(202, b"/somewhere/narci_zero_cn_.exe\0"),
+            Process(203, b"/usr/bin/steam\0"),
+        ]))
+        with patch.object(im, "os", types.SimpleNamespace(name="posix")), patch.object(im, "Path", return_value=proc):
+            processes = im.running_game_processes(self.game)
+        self.assertEqual(processes, ["narci_onetwo_cn.exe (PID 201)", "narci_zero_cn_.exe (PID 202)"])
 
     def test_game_started_during_staging_blocks_commit(self):
         checks = iter([[], ["narci_onetwo.exe"]])
