@@ -12,6 +12,7 @@ import subprocess
 import sys
 import sysconfig
 import tkinter
+import urllib.error
 import urllib.request
 import zipfile
 import zlib
@@ -24,18 +25,41 @@ def runtime_notices(destination):
     python_version = '.'.join(map(str, sys.version_info[:3]))
     tcl_version = tkinter.Tcl().eval('info patchlevel')
     openssl_version = ssl.OPENSSL_VERSION.split()[1]
-    sources = {
-        'CPython-LICENSE.txt': f'https://raw.githubusercontent.com/python/cpython/v{python_version}/LICENSE',
-        'OpenSSL-LICENSE.txt': f'https://raw.githubusercontent.com/openssl/openssl/openssl-{openssl_version}/LICENSE.txt',
-        'zlib-LICENSE.txt': f'https://raw.githubusercontent.com/madler/zlib/v{zlib.ZLIB_RUNTIME_VERSION}/LICENSE',
-        'Tcl-LICENSE.txt': f"https://raw.githubusercontent.com/tcltk/tcl/core-{tcl_version.replace('.', '-')}/license.terms",
+    zlib_version = zlib.ZLIB_RUNTIME_VERSION
+    openssl_url = f'https://raw.githubusercontent.com/openssl/openssl/openssl-{openssl_version}/LICENSE.txt'
+    candidates = {
+        'CPython-LICENSE.txt': (python_version, [f'https://raw.githubusercontent.com/python/cpython/v{python_version}/LICENSE']),
+        'OpenSSL-LICENSE.txt': (openssl_version, [openssl_url]),
+        'zlib-LICENSE.txt': (zlib_version, [
+            f'https://raw.githubusercontent.com/madler/zlib/v{zlib_version}/LICENSE',
+            f'https://raw.githubusercontent.com/madler/zlib/v{zlib_version}/README']),
+        'Tcl-LICENSE.txt': (tcl_version, [f"https://raw.githubusercontent.com/tcltk/tcl/core-{tcl_version.replace('.', '-')}/license.terms"]),
     }
-    for filename, url in sources.items():
-        with urllib.request.urlopen(url, timeout=30) as response:
-            data = response.read(256 * 1024)
-        if len(data) < 100 or b'<html' in data.lower():
-            raise ValueError(f'Invalid runtime license response: {filename}')
-        (destination / filename).write_bytes(data)
+    sources = {}
+    for filename, (version, urls) in candidates.items():
+        failure = None
+        for url in urls:
+            try:
+                with urllib.request.urlopen(url, timeout=30) as response:
+                    data = response.read(256 * 1024)
+            except urllib.error.HTTPError as exc:
+                if exc.code == 404:
+                    failure = exc
+                    continue
+                raise RuntimeError(f'Cannot fetch {filename} for version {version}: {url} (HTTP {exc.code})') from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError(f'Cannot fetch {filename} for version {version}: {url}') from exc
+            if len(data) < 100 or b'<html' in data.lower():
+                raise ValueError(f'Invalid runtime license response: {filename}, version {version}, {url}')
+            if url.endswith('/README') and (f'zlib {version}'.encode() not in data
+                    or b'Copyright notice:' not in data or b'This notice may not be removed or altered' not in data):
+                raise ValueError(f'The zlib {version} README does not contain its version and complete license notice')
+            (destination / filename).write_bytes(data)
+            sources[filename] = url
+            print(f'Runtime notice: {filename}, version {version}, {url}', flush=True)
+            break
+        else:
+            raise RuntimeError(f'No version-matched runtime notice found for {filename}, version {version}: {urls}') from failure
     (destination / 'runtime-sources.json').write_text(json.dumps(sources, indent=2), encoding='utf-8')
 
 
