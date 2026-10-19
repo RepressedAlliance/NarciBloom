@@ -8,8 +8,11 @@
 | [evbunpack](https://github.com/mos9527/evbunpack) | `ee7b647acf2a46617b0c448dfa83d63132ea917b` | Apache-2.0 | 从用户本地的汉化程序中提取虚拟文件 |
 | [pefile](https://github.com/erocarrera/pefile) | `2024.8.26` | MIT | 识别 PE 文件位置 |
 | [aplib](https://github.com/snemes/aplib) | `0.6` | MIT | evbunpack 的解压依赖 |
+| PyInstaller | `6.22.3` | GPL-2.0-or-later，含原文 Bootloader Exception | 构建玩家可执行入口，发行包保留 COPYING |
 
 `tools/bootstrap.py` 将 majiro-py 的源码及原始 LICENSE 下载到被 Git 忽略的 `.deps/`。其余依赖由 `requirements.txt` 安装。发布安装包若包含这些依赖，应一并保留各自要求的许可与声明。
+
+玩家包的 `licenses/` 同时保留 Python、Tcl/Tk、libffi、OpenSSL、zlib 与其他实际随包依赖的原始声明；版本以各平台的 `build-info.json`、`licenses/runtime-sources.json` 和原生运行库清单为准。Linux 构建使用兼容 SteamOS 的系统 X11、字体和 RAR 库，不另外复制整套系统库。运行库声明收集器记录实际来源及缺口，不将通用许可证文本当作对应源码或其他义务已经满足的证明。
 
 `tools/translation_adapter.py` 的 Enigma Virtual Box 数据树解析与 PE 恢复逻辑参考并改编自上述固定版本的 evbunpack；该部分遵循 Apache-2.0，原始版权及许可随依赖保留。它在内存中处理玩家提供的程序，不执行输入程序。
 

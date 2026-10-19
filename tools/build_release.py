@@ -10,6 +10,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import sysconfig
 import tkinter
 import urllib.request
 import zipfile
@@ -38,6 +39,45 @@ def runtime_notices(destination):
     (destination / 'runtime-sources.json').write_text(json.dumps(sources, indent=2), encoding='utf-8')
 
 
+def bundle_existing(font_package, translation_archive, destination):
+    """Add an unchanged original RAR to a built platform package.
+
+    This also allows a Linux build from CI to be bundled on Windows without
+    rebuilding its native launcher or losing the ZIP executable permission bits.
+    """
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from translation_package import read_package
+    read_package(translation_archive, [])
+    if not font_package.name.endswith('-Fonts.zip'):
+        raise ValueError('Select an original Fonts ZIP package')
+    destination.mkdir(parents=True, exist_ok=True)
+    target = destination / font_package.name.replace('-Fonts.zip', '-Chinese.zip')
+    with zipfile.ZipFile(font_package) as source, zipfile.ZipFile(target, 'x', zipfile.ZIP_DEFLATED) as output:
+        roots = {item.filename.split('/')[0] for item in source.infolist()}
+        if len(roots) != 1:
+            raise ValueError('Expected exactly one portable package folder')
+        old_root = roots.pop()
+        new_root = old_root.removesuffix('-Fonts') + '-Chinese'
+        launcher = False
+        for item in source.infolist():
+            parts = Path(item.filename).parts
+            if '..' in parts or item.filename.startswith('/'):
+                raise ValueError('Unexpected archive path')
+            data = source.read(item)
+            relative = item.filename[len(old_root) + 1:]
+            if relative in ('NarciBloom', 'NarciBloom.exe'):
+                relative = relative.replace('NarciBloom', 'NarciBloomChinese', 1)
+                launcher = True
+            item.filename = new_root + '/' + relative
+            output.writestr(item, data)
+        if not launcher:
+            raise ValueError('Native launcher is missing')
+        output.write(translation_archive, new_root + '/N10 ver1.1补丁.rar')
+    with target.open('rb') as stream:
+        checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return {'filename': target.name, 'sha256': checksum, 'size_bytes': target.stat().st_size}
+
+
 def build(destination, translation_archive=None):
     sys.path.insert(0, str(ROOT / 'tools'))
     from installer_app_backend import VERSION
@@ -46,17 +86,30 @@ def build(destination, translation_archive=None):
     destination.mkdir(parents=True, exist_ok=True)
     if any(destination.iterdir()):
         raise SystemExit('Choose a new empty build destination; existing output is retained')
-    command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir',
-               '--name', 'NarciBloom', '--paths', str(ROOT / 'tools'),
-               '--paths', str(ROOT / '.deps/majiro-py/src'),
-               '--hidden-import', 'installer_app_backend', '--hidden-import', 'chinese_builder',
-               '--collect-all', 'mjotool', '--collect-all', 'evbunpack',
+    # Keep common SteamOS libraries on the OS instead of redistributing an
+    # accidental copy of its X11/GLib/font/RAR stack and its source obligations.
+    # Python extensions and Python itself are retained by PyInstaller's API.
+    spec = destination / 'NarciBloom.spec'
+    spec.write_text(f'''import sys
+from PyInstaller.utils.hooks import collect_data_files
+sys.path.insert(0, {str(ROOT / '.deps/majiro-py/src')!r})
+a = Analysis([{str(ROOT / 'tools/app.py')!r}],
+    pathex=[{str(ROOT / 'tools')!r}, {str(ROOT / '.deps/majiro-py/src')!r}],
+    binaries=[], datas=[({str(ROOT / 'docs')!r}, 'docs')] + collect_data_files('evbunpack'),
+    hiddenimports=['installer_app_backend', 'chinese_builder'],
+    hookspath=[], hooksconfig={{}}, runtime_hooks=[], excludes=[], noarchive=False)
+if sys.platform != 'win32':
+    a.exclude_system_libraries(['libtcl*.so*', 'libtk*.so*', 'libffi.so*',
+                               'libcrypto.so*', 'libssl.so*', 'libz.so*'])
+pyz = PYZ(a.pure)
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='NarciBloom',
+          debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
+          console={sys.platform != 'win32'!r})
+collection = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='NarciBloom')
+''', encoding='utf-8')
+    command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
                '--distpath', str(destination / 'frozen'), '--workpath', str(destination / 'pyinstaller'),
-               '--specpath', str(destination),
-               '--add-data', str(ROOT / 'docs') + ':docs']
-    if sys.platform == 'win32':
-        command.append('--windowed')
-    command.append(str(ROOT / 'tools/app.py'))
+               str(spec)]
     subprocess.run(command, cwd=ROOT, check=True)
     folder = destination / 'frozen/NarciBloom'
     notices = folder / 'licenses'
@@ -65,6 +118,15 @@ def build(destination, translation_archive=None):
     shutil.copy2(ROOT / 'THIRD_PARTY.md', notices / 'THIRD_PARTY.md')
     shutil.copy2(ROOT / '.deps/majiro-py/LICENSE', notices / 'majiro-py-LICENSE.txt')
     runtime_notices(notices)
+    if sys.platform != 'win32':
+        from runtime_licenses import collect_native_notices
+        native = collect_native_notices(folder, notices, provider_notices=[{
+            'provider': 'CPython', 'source_root': sys.base_prefix,
+            'stdlib_extension_root': sysconfig.get_config_var('DESTSHARED'),
+            'notice': notices / 'CPython-LICENSE.txt'}])
+        if native['unresolved_files'] or native['missing_notices'] or native['source_review_required']:
+            raise ValueError('Native runtime notices need review; inspect licenses/native-runtime-report.json')
+        (notices / 'native-runtime-report.json').write_text(json.dumps(native, indent=2), encoding='utf-8')
     for package in ['evbunpack', 'aplib', 'pefile', 'PyInstaller', 'altgraph', 'pyinstaller-hooks-contrib']:
         distribution = importlib.metadata.distribution(package)
         for item in distribution.files or []:
@@ -74,6 +136,16 @@ def build(destination, translation_archive=None):
                     shutil.copy2(source, notices / (package + '-' + item.name))
     for name in ['INSTALLATION.md', 'TRANSLATION.md', 'COMPATIBILITY.md']:
         shutil.copy2(ROOT / 'docs' / name, folder / name)
+    try:
+        revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True)
+        changes = subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT, capture_output=True, text=True)
+    except OSError:
+        revision = changes = None
+    (folder / 'build-info.json').write_text(json.dumps({
+        'version': VERSION, 'source_revision': revision.stdout.strip() if revision and revision.returncode == 0 else None,
+        'source_has_uncommitted_changes': bool(changes.stdout.strip()) if changes and changes.returncode == 0 else None,
+        'platform': sys.platform, 'python': '.'.join(map(str, sys.version_info[:3])),
+        'pyinstaller': importlib.metadata.version('PyInstaller')}, indent=2), encoding='utf-8')
     extension = '.exe' if sys.platform == 'win32' else ''
     platform = 'Windows-x64' if sys.platform == 'win32' else 'SteamOS-Linux-x64'
     if not extension:
@@ -106,5 +178,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--translation-archive', type=Path)
+    parser.add_argument('--bundle-existing', type=Path, help='Create the Chinese variant from a built Fonts ZIP')
     arguments = parser.parse_args()
-    print(json.dumps(build(arguments.output, arguments.translation_archive), indent=2))
+    if arguments.bundle_existing:
+        if not arguments.translation_archive:
+            parser.error('--bundle-existing requires --translation-archive')
+        print(json.dumps(bundle_existing(arguments.bundle_existing, arguments.translation_archive, arguments.output), indent=2))
+    else:
+        print(json.dumps(build(arguments.output, arguments.translation_archive), indent=2))
