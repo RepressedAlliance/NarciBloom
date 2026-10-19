@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "module": "narci_onetwo",
+      "language": "ja",
+      "exe_sha256": "c573a0901b007c1db2cc96f6277aafe15401352b7c52f4a2bb16b6bc69ce8693",
+      "files": {
+        "sysdata.cfg": "1068c13c5d5289c6fa0b4e4cc5464d849d78a640e6b7fbeea6755a284894510a",
+        "sysdata27.cfg": "15f711bfd1da4915dd91eb4c2b431360e7c14d2bdf74d47fe235da9c6a4bdd70",
+        "ナルキ１全画面中央.cfg": "33312e383f081cfd50351592e32537cd789ebe3b7159e03b083a36cf9a10e17a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "pausemenu.mjo": "0bb6c81c2b5812550ccd1fee2c3e2ea774d868ee085fb50f9c0e0b9fa77e4a65",
+        "load_sysdata.mjo": "4ccc8bd35590d9fb6531b264c70e0b74e8db3dcd36ca8410ad4fb7017d241add",
+        "console.mjo": "3c424a800865d4c97da32129af4021d63ebc51e46d88d053518327f43f35c800"
+      }
+    },
+    {
+      "module": "narci_himeko",
+      "language": "ja",
+      "exe_sha256": "45c8a1b5ea39a552629e637e4435b9fa9639978f40f3c164a24867c739d70075",
+      "files": {
+        "sysdata.cfg": "7c30941b0af3790a9092acf3b4be9752504ca9fb52d4acdd22146de222c2af1a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "5ef83a257af36c8103d97564242c9748acee2c67be5441364413b93bd456f35a"
+      }
+    },
+    {
+      "module": "narci_iris",
+      "language": "ja",
+      "exe_sha256": "f687e510f14dcbb2fe467f31b740f10e8baa6ca981ca626d61d0b6b7ee7cc825",
+      "files": {
+        "sysdata.cfg": "7c30941b0af3790a9092acf3b4be9752504ca9fb52d4acdd22146de222c2af1a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "1633584c5db4baac6ff5b0492e465ba3b5e582a29eace0a54a6eb2948cef381f"
+      }
+    },
+    {
+      "module": "narci_zero",
+      "language": "ja",
+      "exe_sha256": "f85b6f836bf21360c50e997664df5635992a06c3eb8c3fa21ffd51811adfb137",
+      "files": {
+        "sysdata.cfg": "7c30941b0af3790a9092acf3b4be9752504ca9fb52d4acdd22146de222c2af1a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "1633584c5db4baac6ff5b0492e465ba3b5e582a29eace0a54a6eb2948cef381f"
+      }
+    },
+    {
+      "module": "narci_sumire",
+      "language": "ja",
+      "exe_sha256": "33ca175716962f6387523fac3d4c8edc4864b038c7ac3953e7e62b19091fff40",
+      "files": {
+        "sysdata.cfg": "7c30941b0af3790a9092acf3b4be9752504ca9fb52d4acdd22146de222c2af1a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "4d2a259861c06ef8c689bbf38c4523deb85c000e79f4ace3ed926df4561ae453"
+      }
+    },
+    {
+      "module": "narci_onetwo",
+      "language": "en",
+      "exe_sha256": "f0255f28dd6ce77b71565363e75e5b59ea192da0136b50cfa6d62cfd8b0f40d3",
+      "files": {
+        "sysdata.cfg": "97fe8ae805dfa893a1d30bf60fa6e1424139b2dde7e54db6d78d4099cd90cfce",
+        "sysdata27.cfg": "15f711bfd1da4915dd91eb4c2b431360e7c14d2bdf74d47fe235da9c6a4bdd70",
+        "ナルキ１全画面中央.cfg": "33312e383f081cfd50351592e32537cd789ebe3b7159e03b083a36cf9a10e17a",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "pausemenu.mjo": "5024e96aa30d23973158abed5721e01078918d0275ca55ca3f3a6cf842048fed",
+        "load_sysdata.mjo": "4ccc8bd35590d9fb6531b264c70e0b74e8db3dcd36ca8410ad4fb7017d241add",
+        "console.mjo": "6236dfc13c0a4ee2d9c1d41086e14815a93910726f29b15f8c5169be6e951031"
+      }
+    },
+    {
+      "module": "narci_himeko",
+      "language": "en",
+      "exe_sha256": "dbbbd6ce447846311a2ff934f8c15d51b9f3ca384b55d1e639d339633e6ec8e2",
+      "files": {
+        "sysdata.cfg": "5f3b05ff952d5fd37a0b35b66ccb525cff008c4a8d0192ae6184dd026c604482",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "161f7f7dd69bc21d7a6b4c038239ffdf9156abdcae3d9199db720428c228695b"
+      }
+    },
+    {
+      "module": "narci_iris",
+      "language": "en",
+      "exe_sha256": "f88df926e03f806cd354ecc21ae4fda6fe272cbe8b57f31ef95550f9046ff6e4",
+      "files": {
+        "sysdata.cfg": "5f3b05ff952d5fd37a0b35b66ccb525cff008c4a8d0192ae6184dd026c604482",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "b978148a5b89eece8bd16edc0b42da57606a8777fd466ffb046c6407cc7f3f62"
+      }
+    },
+    {
+      "module": "narci_zero",
+      "language": "en",
+      "exe_sha256": "d2bd02daed3053b970f8d2006173ff9c40a24dbd5c6555925eddb0b214517df1",
+      "files": {
+        "sysdata.cfg": "9252850ce70f8401d1f3103373a5d67c0af2e2823e749bdf09419fd653303244",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "52a72ae67a693e1fe9471f229747799fe6ab681f454d2880b90471aaa7a5513a"
+      }
+    },
+    {
+      "module": "narci_sumire",
+      "language": "en",
+      "exe_sha256": "a39ab5c816cf447bd6e0e54110abe617225b93da9bc05e5e7d49a935b2aeda56",
+      "files": {
+        "sysdata.cfg": "3ee26cbef41c65238fc7c68b38774d54e9caa119e01c9992e0022b189d833235",
+        "プロダクツ用設定.cfg": "15beb63bd6e51f8c3d2542f2d312023d746c9863c3625085e07e083e4963e9ec",
+        "config.mjo": "be24b5acdf8c687b24006c1060f5c5d50032523ec535daa34d2a9090a8f219e0",
+        "load_sysdata.mjo": "ca7fd494171a6b96b0478a42d40fe1d9d5e7ac6a255d48e3dc33dd44ff8ee392",
+        "console.mjo": "e125561cdd638fb77b457bea95d01792c3e57dac1b505a119dade33bb6748697"
+      }
+    }
+  ]
+}
