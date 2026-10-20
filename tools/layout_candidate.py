@@ -9,6 +9,10 @@ from build_font_settings import Builder, Script, emit, hash32
 
 CONSOLE_SET = 0x403960F8       # (page, x, y, width, height)
 CONSOLE_CLEAR = 0xB5A1E3C9     # () immediate native clear, retaining pending text
+HISTBUFF_DISABLE = 0xD4066E31  # () increment the native history recording depth
+HISTBUFF_ENABLE = 0x4133D7A9   # () decrement that depth; not a Boolean switch
+CONSOLE_REDRAW = 0x307F28BC    # (history index), yielding native snapshot replay
+HOT_RESET = hash32('$hot_reset@CONSOLE')
 CURSOR_Y = 0x934D927B         # () -> current absolute console y
 FONT_HEIGHT = 0x82FD765B      # () -> active console font height parameter
 CLIENT_HEIGHT = 0x8C283F7F    # () -> logical game canvas height
@@ -30,7 +34,9 @@ CON_MODE = hash32('@con_mode@CONSOLE')
 STATE = {name:hash32('@cdx_page_'+name+'@NARCI_LAYOUT')
          for name in ('bottom','busy','last_x','last_y','last_valid')}
 FUNCTIONS = {name:hash32('$cdx_page_'+name+'@NARCI_LAYOUT')
-             for name in ('set','page','wrote','crlf','register')}
+             for name in ('set','page','wrote','crlf','register','redraw')}
+REDRAW_ARGUMENT = hash32('_cdx_replay_index@')
+REDRAW_OLD_BUSY = hash32('_cdx_replay_old_busy@')
 ARGUMENTS = {-2:hash32('_page@'),-3:hash32('_x@'),-4:hash32('_y@'),
              -5:hash32('_xl@'),-6:hash32('_yl@')}
 
@@ -76,7 +82,11 @@ def pagination_functions():
     b.call(PAGE_WAIT)
     # The MJO ctrl-w opcode is queued while native text is pending. This syscall
     # directly enters the native w handler instead, so reset precedes continuation.
+    # The full text operand is already in the save/history buffer. Recording an
+    # extra w here would replay after that text and erase a loaded paragraph.
+    b.syscall(HISTBUFF_DISABLE,0)
     b.syscall(CONSOLE_CLEAR,0)
+    b.syscall(HISTBUFF_ENABLE,0)
     b.integer(0);_store(b,'busy')
     b.label('done')
     page_code=b.ret().finish()
@@ -97,10 +107,52 @@ def pagination_functions():
     for event,handler in [('CONSOLE_WROTE','wrote'),('CRLF','crlf')]:
         b.integer(_signed(FUNCTIONS[handler])).text(event).syscall(EVENT_AFTER,2)
     register_code=b.ret().finish()
+
+    # Snapshot replay yields and rewinds the native syscall's own eight bytes.
+    # Keep its frame and saved local alive until completion. Suppress only our
+    # pagination callbacks during replay; ordinary instant/skip text still pages.
+    b=Builder('cp932').op('argcheck',b'\0').op('alloca',b'\0')
+    _load(b,'busy').store(REDRAW_OLD_BUSY,scope=3,slot=0)
+    b.integer(1);_store(b,'busy')
+    b.load(REDRAW_ARGUMENT,scope=3,slot=-2).syscall(CONSOLE_REDRAW,1)
+    b.load(REDRAW_OLD_BUSY,scope=3,slot=0);_store(b,'busy')
+    redraw_code=b.ret().finish()
     output={FUNCTIONS[name]:code for name,code in (
         ('set',set_code),('page',page_code),('wrote',wrote_code),
-        ('crlf',crlf_code),('register',register_code))}
+        ('crlf',crlf_code),('register',register_code),('redraw',redraw_code))}
     return output
+
+
+def _snapshot_redraw(script):
+    """Recognize the single snapshot redraw, leaving font/history redraws alone."""
+    starts=[o for h,o in script.functions if h==HOT_RESET]
+    assert len(starts)==1, 'Expected one original hot_reset function'
+    start=starts[0]
+    end=min([o for _,o in script.functions if o>start]+[len(script.code)])
+    body=[i for i in script.ins if start<=i.offset<end]
+    calls=[i for i in body if i.fields.get('h')==CONSOLE_REDRAW
+           and i.name in ('syscall','syscallp','call','callp')]
+    assert len(calls)==1, 'Expected one hot_reset snapshot redraw'
+    call=calls[0]
+    assert call.name=='syscallp' and call.fields['a']==1 and len(call.raw)==8, 'Unknown snapshot redraw signature'
+    previous=body[body.index(call)-1]
+    assert previous.name=='ldc.i' and previous.fields['i']==-1, 'Unknown snapshot redraw index'
+    for hashed in (HISTBUFF_DISABLE,HISTBUFF_ENABLE):
+        calls=[i for i in script.ins if i.fields.get('h')==hashed
+               and i.name in ('syscall','syscallp','call','callp')]
+        assert calls and all(i.name=='syscallp' and i.fields['a']==0 and len(i.raw)==8
+                             for i in calls), 'Unknown history recording signature'
+    return call
+
+
+def _replace_syscallp(script,inst,function):
+    """Use an appended call trampoline without moving existing bytecode."""
+    assert inst.name=='syscallp' and len(inst.raw)==8
+    trampoline=len(script.code)
+    script.code.extend(emit('callp',function,0,inst.fields['a']))
+    script.code.extend(emit('br',inst.offset+8-(len(script.code)+6)))
+    script.code[inst.offset:inst.offset+8]=emit('br',trampoline-(inst.offset+6))+emit('ret')
+    return trampoline
 
 
 def _auto_history_cases(instructions):
@@ -180,6 +232,7 @@ def patch_console_pagination(blob):
     s=Script(blob)
     assert PAUSE_INTER in {h for h,_ in s.functions}, 'Original pause_inter function missing'
     assert not ((set(FUNCTIONS.values())|{PAGE_WAIT,PAGE_MENU}) & {h for h,_ in s.functions}), 'Already patched pagination candidate'
+    redraw=_snapshot_redraw(s)
     wait_code,removed=clone_page_wait(s)
     auto_history_cases=_auto_history_cases(Script.parse(bytes(s.original[
         dict(s.functions)[PAUSE_INTER]:dict(s.functions)[PAUSE_INTER]+len(wait_code)])))
@@ -199,12 +252,11 @@ def patch_console_pagination(blob):
     set_calls=[i for i in s.ins if i.name=='syscallp' and i.fields.get('h')==CONSOLE_SET]
     assert set_calls and all(i.fields['a']==5 and len(i.raw)==8 for i in set_calls)
     for ins in set_calls:
-        trampoline=len(s.code)
-        s.code.extend(emit('callp',FUNCTIONS['set'],0,5))
-        s.code.extend(emit('br',ins.offset+8-(len(s.code)+6)))
-        s.code[ins.offset:ins.offset+8]=emit('br',trampoline-(ins.offset+6))+emit('ret')
+        _replace_syscallp(s,ins,FUNCTIONS['set'])
     s.hook_after(registrations[0],FUNCTIONS['register'])
-    for hashed,code in pagination_functions().items(): s.add(hashed,code)
+    functions=pagination_functions()
+    for hashed,code in functions.items():
+        if hashed!=FUNCTIONS['redraw']:s.add(hashed,code)
     aliases={}
     for original,hashed,code in ((PAUSE_INTER,PAGE_WAIT,wait_code),(PAUSE_MENU,PAGE_MENU,menu_code)):
         if code is None:continue
@@ -213,10 +265,15 @@ def patch_console_pagination(blob):
         aliases.update({target_start+i.offset:source_start+i.offset
                         for i in Script.parse(code) if i.name=='ldstr'})
         s.add(hashed,code)
+    redraw_trampoline=_replace_syscallp(s,redraw,FUNCTIONS['redraw'])
+    s.add(FUNCTIONS['redraw'],functions[FUNCTIONS['redraw']])
     report={'experimental':True,'enabled_console_modes':'all; current bounds captured from console_set',
             'font_sizes_changed':False,'stage_geometry_changed':False,
             'page_boundary':'min(console y + height, client_height)',
-            'clear_method':'immediate console_cls syscall; no queued ctrl opcode',
+            'clear_method':'immediate console_cls syscall with balanced history recording depth; no queued ctrl opcode',
+            'snapshot_replay_guard':{'function':HOT_RESET,'redraw_offset':redraw.offset,
+                                     'trampoline_offset':redraw_trampoline,'wrapper':FUNCTIONS['redraw'],
+                                     'behavior':'preserve old busy in a local; suppress pagination until native redraw completes'},
             'save_behavior':'inserted waits retain preceding natural paragraph save point; no exact mid-page resume',
             'cloned_wait_removed_calls':removed,
             'cloned_menu_removed_calls':menu_removed,

@@ -10,7 +10,8 @@ from layout_candidate import (FUNCTIONS,STATE,CON_MODE,IS_HISTORY,PAUSE_INTER,PA
                               CONSOLE_SET,CURSOR_Y,FONT_HEIGHT,LOCATE_FORCE,
                               CONSOLE_CLEAR,CLIENT_HEIGHT,EVENT_HOOK,EVENT_AFTER,pagination_functions,
                               patch_console_pagination,patch_sensitive_menu_entry,
-                              clone_page_wait,IS_AUTO_MODE,_auto_history_cases)
+                              clone_page_wait,IS_AUTO_MODE,_auto_history_cases,
+                              HISTBUFF_DISABLE,HISTBUFF_ENABLE,CONSOLE_REDRAW,HOT_RESET)
 
 MK_READ=0x892E9B20
 VOICE_STAT=0xD0C1FAEB  # Synthetic boundary; the model does not emulate native audio.
@@ -47,9 +48,21 @@ class EngineModel:
         self.registrations=[]
         self.menu_calls=[]
         self.on_pause=None
+        self.on_redraw=None
+        self.history_depth=0
+        self.recorded_controls=[]
+        self.replaying=False
+        self.visible=''
         self.depth=0
 
     def run(self,function,args=()):
+        execution=self.execute(function,args)
+        while True:
+            try:next(execution)
+            except StopIteration as result:return result.value
+
+    def execute(self,function,args=()):
+        """Retain call frames/locals across a simulated native redraw yield."""
         if function==IS_HISTORY:return int(self.history)
         if function in (HISTORY,CONFIG_MENU):
             self.menu_calls.append(function)
@@ -61,18 +74,26 @@ class EngineModel:
         self.depth+=1
         assert self.depth<12
         ins=Script.parse(self.code[function]);lookup={i.offset:i for i in ins}
-        stack=[];pc=0;steps=0
+        stack=[];locals_=[];args=list(args);pc=0;steps=0
         while True:
             steps+=1;assert steps<2000
             i=lookup[pc];pc+=len(i.raw);f=i.fields;n=i.name
             if n=='argcheck':assert len(args)>=len(f['t'])
-            elif n=='alloca':pass
+            elif n=='alloca':
+                assert all(t==0 for t in f['t'])
+                locals_=[0]*len(f['t'])
             elif n=='ldc.i':stack.append(f['i'])
             elif n=='ldstr':stack.append(f['s'].rstrip(b'\0').decode('ascii'))
             elif n=='ld':
                 scope=(f['f']>>5)&7
-                stack.append(args[-f['o']-2] if scope==3 else self.variables.get((scope,f['h']),0))
-            elif n=='st.i':self.variables[((f['f']>>5)&7,f['h'])]=stack[-1]
+                stack.append((args[-f['o']-2] if f['o']<0 else locals_[f['o']])
+                             if scope==3 else self.variables.get((scope,f['h']),0))
+            elif n=='st.i':
+                scope=(f['f']>>5)&7
+                if scope==3:
+                    if f['o']<0:args[-f['o']-2]=stack[-1]
+                    else:locals_[f['o']]=stack[-1]
+                else:self.variables[(scope,f['h'])]=stack[-1]
             elif n=='pop':stack.pop()
             elif n in ('add.i','ceq.i','cgt.i'):
                 right,left=stack.pop(),stack.pop()
@@ -84,7 +105,7 @@ class EngineModel:
                 count=f['a'];assert len(stack)>=count
                 params=list(reversed(stack[-count:])) if count else []
                 if count:del stack[-count:]
-                if n.startswith('call'):result=self.run(f['h'],params)
+                if n.startswith('call'):result=yield from self.execute(f['h'],params)
                 else:
                     result=0
                     if f['h']==CURSOR_Y:result=self.cursor[1]
@@ -94,9 +115,18 @@ class EngineModel:
                     elif f['h']==CONSOLE_SET:
                         _,x,y,_,_=params;self.origin=[x,y];self.cursor=[x,y]
                     elif f['h']==CONSOLE_CLEAR:
-                        self.clears+=1
-                        self.cursor=self.origin.copy()
-                        self.run(FUNCTIONS['set'],[123,*self.origin,690,88])
+                        # Native console_cls ignores its w during replay. The
+                        # history counter controls recording, not drawing.
+                        if not self.replaying:
+                            if not self.history_depth:self.recorded_controls.append('w')
+                            self.visible=''
+                            self.clears+=1
+                            self.cursor=self.origin.copy()
+                            self.run(FUNCTIONS['set'],[123,*self.origin,690,88])
+                    elif f['h']==HISTBUFF_DISABLE:self.history_depth+=1
+                    elif f['h']==HISTBUFF_ENABLE:self.history_depth-=1
+                    elif f['h']==CONSOLE_REDRAW:
+                        if self.on_redraw:yield from self.on_redraw(params)
                     elif f['h']==EVENT_AFTER:self.registrations.append(params)
                     else:raise AssertionError(hex(f['h']))
                 if n in ('call','syscall'):stack.append(result)
@@ -111,8 +141,10 @@ def synthetic_console(existing_after=False,external_case=False):
     b=Builder('cp932').prologue().integer(0x1234).text('CRLF').syscall(EVENT_HOOK,2)
     if existing_after:b.integer(0x5678).text('CONSOLE_WROTE').syscall(EVENT_AFTER,2)
     for value in [88,690,490,90,123]:b.integer(value)
-    b.syscall(CONSOLE_SET,5).ret()
-    first=b.finish()
+    b.syscall(CONSOLE_SET,5)
+    first=b.integer(0).syscall(CONSOLE_REDRAW,1).ret().finish()
+    hot=(Builder().prologue(3).syscall(HISTBUFF_DISABLE,0).integer(-1)
+         .syscall(CONSOLE_REDRAW,1).syscall(HISTBUFF_ENABLE,0).ret().finish())
     p=(Builder().prologue().text('checkpoint').syscall(SAVE_POINT,1)
        .branch('br','end'))
     auto_input_cases(p)
@@ -120,10 +152,11 @@ def synthetic_console(existing_after=False,external_case=False):
     if external_case:p.integer(0).op('br.case',0).integer(-2).branch('bne.case','end')
     pause=p.call(PAUSE_MENU,result=True).op('pop').call(PAUSE_MENU).label('end').ret().finish()
     menu=Builder().prologue().call(HISTORY).call(CONFIG_MENU).ret().finish()
-    code=first+pause+menu
-    return (struct.pack('<16sIII',b'MajiroObjV1.000\0',0,1,3)
-            +struct.pack('<II',0x1234,0)+struct.pack('<II',PAUSE_INTER,len(first))
-            +struct.pack('<II',PAUSE_MENU,len(first)+len(pause))
+    code=first+hot+pause+menu
+    return (struct.pack('<16sIII',b'MajiroObjV1.000\0',0,1,4)
+            +struct.pack('<II',0x1234,0)+struct.pack('<II',HOT_RESET,len(first))
+            +struct.pack('<II',PAUSE_INTER,len(first)+len(hot))
+            +struct.pack('<II',PAUSE_MENU,len(first)+len(hot)+len(pause))
             +struct.pack('<I',len(code))+code)
 
 
@@ -213,6 +246,122 @@ class TimedWaitModel:
 
 
 class PaginationTests(unittest.TestCase):
+    def test_page_clear_preserves_nested_history_recording_depth(self):
+        for depth in (0,1,3):
+            with self.subTest(depth=depth):
+                vm=self.configured();vm.history_depth=depth;vm.visible='FULL'
+                vm.cursor[1]=1000
+                vm.run(FUNCTIONS['wrote'],[123,90,534,400,40,0])
+                self.assertEqual((vm.pauses,vm.clears,vm.visible),(1,1,''))
+                self.assertEqual(vm.history_depth,depth)
+                self.assertEqual(vm.recorded_controls,[])
+
+    def test_inserted_clear_does_not_erase_the_saved_text_on_replay(self):
+        # The engine records the whole text operand before its render callbacks.
+        # Replaying a subsequent recorded w therefore erases the entire operand,
+        # rather than reproducing a page boundary inside it. This tiny cache
+        # interpreter deliberately does not emulate font layout or input.
+        def replay(controls):
+            visible='TAIL'  # Native overflow leaves the last visible text.
+            for control in controls+['p']:
+                if control=='w':visible=''
+                elif control=='p':return visible
+                else:raise AssertionError(control)
+        original=pagination_functions()[FUNCTIONS['page']]
+        legacy=bytearray(original)
+        for i in Script.parse(original):
+            if i.fields.get('h') in (HISTBUFF_DISABLE,HISTBUFF_ENABLE):
+                legacy[i.offset:i.offset+8]=emit('ldc.i',0)+emit('pop')
+        results=[]
+        for code in (legacy,original):
+            vm=self.configured();vm.code[FUNCTIONS['page']]=code;vm.cursor[1]=1000
+            vm.run(FUNCTIONS['wrote'],[123,90,534,400,40,0])
+            results.append(replay(vm.recorded_controls))
+            self.assertEqual(vm.clears,1)
+        self.assertEqual(results,['','TAIL'])
+
+    def patched_model(self):
+        patched,report=patch_console_pagination(synthetic_console())
+        script=Script(patched);vm=self.configured()
+        # Suffixes preserve relative branches into appended trampolines and back.
+        vm.code.update({h:bytes(script.code[o:]) for h,o in script.functions})
+        return vm,script,report
+
+    def test_snapshot_redraw_yields_with_page_callbacks_suppressed(self):
+        for old_busy in (0,7):
+            with self.subTest(old_busy=old_busy):
+                vm,script,report=self.patched_model()
+                vm.run(FUNCTIONS['wrote'],[123,90,490,100,40,0])
+                vm.variables[(1,STATE['busy'])]=old_busy
+                def redraw(args):
+                    self.assertEqual(args,[-1])
+                    # Each native continuation can dispatch render callbacks.
+                    # The wrapper frame/local must survive all these yields.
+                    for phase in ('text','wrap','paragraph'):
+                        vm.cursor[1]=1000
+                        vm.run(FUNCTIONS['wrote'],[123,90,534,400,40,1])
+                        vm.run(FUNCTIONS['crlf'])
+                        yield phase
+                vm.on_redraw=redraw
+                execution=vm.execute(HOT_RESET,[0,0,1])
+                for phase in ('text','wrap','paragraph'):
+                    self.assertEqual(next(execution),phase)
+                    self.assertEqual(vm.variables[(1,STATE['busy'])],1)
+                    self.assertEqual((vm.pauses,vm.clears,vm.history_depth),(0,0,1))
+                with self.assertRaises(StopIteration):next(execution)
+                self.assertEqual(vm.variables[(1,STATE['busy'])],old_busy)
+                self.assertEqual(vm.history_depth,0)
+                vm.run(FUNCTIONS['crlf'])
+                self.assertEqual(vm.pauses,0 if old_busy else 1)
+                start=dict(script.functions)[FUNCTIONS['redraw']]
+                native=next(i for i in script.ins if i.offset>=start and
+                            i.name=='syscallp' and i.fields['h']==CONSOLE_REDRAW)
+                self.assertEqual(len(native.raw),8) # Native PC-8 re-enters itself.
+
+    def test_redraw_saved_busy_uses_a_frame_local_across_nested_calls(self):
+        vm,_,_=self.patched_model()
+        def redraw(args):
+            vm.on_redraw=None
+            vm.run(FUNCTIONS['redraw'],args)
+            self.assertEqual(vm.variables[(1,STATE['busy'])],1)
+            yield 'nested complete'
+        vm.on_redraw=redraw
+        execution=vm.execute(FUNCTIONS['redraw'],[-1])
+        self.assertEqual(next(execution),'nested complete')
+        with self.assertRaises(StopIteration):next(execution)
+        self.assertEqual(vm.variables[(1,STATE['busy'])],0)
+
+    def test_only_hot_reset_redraw_is_wrapped_and_unknown_shapes_fail(self):
+        source=synthetic_console();before=Script(source)
+        patched,report=patch_console_pagination(source);after=Script(patched)
+        hot=dict(before.functions)[HOT_RESET]
+        redraws=[i for i in before.ins if i.fields.get('h')==CONSOLE_REDRAW]
+        self.assertEqual(len(redraws),2)
+        site=report['snapshot_replay_guard']['redraw_offset']
+        for i in redraws:
+            if i.offset!=site:self.assertEqual(after.code[i.offset:i.offset+8],i.raw)
+        self.assertGreaterEqual(site,hot)
+        self.assertEqual(before.functions,after.functions[:len(before.functions)])
+        self.assertGreater(report['snapshot_replay_guard']['trampoline_offset'],dict(after.functions)[PAGE_MENU])
+        for h in (PAUSE_INTER,PAUSE_MENU):
+            a=dict(before.functions)[h]
+            b=min([o for _,o in before.functions if o>a]+[len(before.code)])
+            self.assertEqual(before.code[a:b],after.code[a:b])
+        for mutation,message in [('missing','one original hot_reset'),('argc','redraw signature'),
+                                 ('result','redraw signature'),('index','redraw index'),
+                                 ('duplicate','one hot_reset snapshot'),('history','history recording')]:
+            with self.subTest(mutation=mutation):
+                s=Script(source)
+                i=next(i for i in s.ins if i.offset==site)
+                if mutation=='missing':s.functions=[(0x98765432 if h==HOT_RESET else h,o) for h,o in s.functions]
+                elif mutation in ('argc','result'):
+                    s.code[site:site+8]=emit('syscall' if mutation=='result' else 'syscallp',CONSOLE_REDRAW,0 if mutation=='argc' else 1)
+                elif mutation=='index':s.code[site-6:site]=emit('ldc.i',0)
+                else:
+                    target=next(i for i in s.ins if i.fields.get('h')==HISTBUFF_ENABLE)
+                    s.code[target.offset:target.offset+8]=emit('syscallp',CONSOLE_REDRAW,1) if mutation=='duplicate' else emit('syscallp',HISTBUFF_ENABLE,1)
+                with self.assertRaisesRegex(AssertionError,message):patch_console_pagination(s.finish())
+
     def test_auto_history_input_retains_both_voice_and_timer_waits(self):
         original=synthetic_timed_wait();script=script_with_wait(original)
         fixed,_=clone_page_wait(script)
