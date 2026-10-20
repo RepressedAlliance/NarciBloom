@@ -4,7 +4,7 @@
 
 《Narcissu 10th Anniversary Anthology Project》Steam 版的字号与排版改良项目，优先改善 Steam Deck 上的阅读体验。
 
-**当前状态：开发预览。** 提供 Windows 与 SteamOS 玩家测试包；已完成的检查与未验证范围分别记录，不承诺所有文本与演出均已通过。
+**当前版本：[v0.2.0-preview.3](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.3) · 开发预览。** 提供 Windows 与 SteamOS 玩家测试包。已修复抽样中复现的分页读档空白、长段历史返回卡住、自动分页提前结束及部分日文界面乱码；尚未验证所有文本、演出和字号组合。
 
 [English](README.en.md) · [兼容性与测试范围](docs/COMPATIBILITY.md) · [开发与构建](docs/DEVELOPMENT.md) · [后续计划](docs/ROADMAP.md) · [更新记录](CHANGELOG.md)
 
@@ -13,6 +13,7 @@
 - 游戏内选择 **24 / 28 / 32 / 36 / 40 / 44** 六档字号，显示当前档位，默认 36。
 - 调整正文、角色名及相关文字的字体参数；图片中绘制好的文字不随之缩放。
 - 修正 1＋2 的小文本区：大字号下换行时不再每行都清除前文。
+- 长段超出当前文本区时分页，继续后显示余文，保留所选字号与文字动画。
 - 修正支持的汉化版本中字体窗口标签与按钮错乱，保留中文剧情与字号菜单。
 - 自动查找 Steam 游戏，按实际安装的故事选择补丁，保留原文件供更新和卸载恢复。
 
@@ -32,18 +33,26 @@
 
 ## 两种安装包
 
-| 包名 | 用途 |
-|---|---|
-| **Fonts** · 独立字体补丁 | 保留游戏当前的日文、英文或受支持中文，只增加字号与排版功能。无需安装汉化。 |
-| **Chinese** · 中文整合包 | 附风铃 PC v1.1 的透明安装材料及原署名，在本机安装中文并加入同一字体功能。无需先运行原汉化程序。 |
+| 包名 | 用途 | Windows | SteamOS / Steam Deck |
+|---|---|---|---|
+| **Fonts** · 独立字体补丁 | 保留当前日文、英文或受支持中文；不含汉化，无需先安装汉化。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-Windows-x64-Fonts.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-SteamOS-Linux-x64-Fonts.zip) |
+| **Chinese** · 中文整合包 | 风铃 PC v1.1 安装材料、原署名与相同字体功能；无需先运行原汉化程序。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-Windows-x64-Chinese.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-SteamOS-Linux-x64-Chinese.zip) |
 
 Windows 提供完整解压后运行的 `.exe`；SteamOS 提供原生可执行程序，安装器无需 Proton。两种包都需要自有 Steam 游戏。中文原包的转载条件、署名与本地生成方式见[汉化来源说明](docs/TRANSLATION.md)。
 
 ## 现在如何使用
 
-从 [GitHub Releases](https://github.com/RepressedAlliance/NarciBloom/releases) 选择对应系统的 **Fonts** 或 **Chinese** ZIP。使用方法见[安装说明](docs/INSTALLATION.md)：关闭游戏、完整解压、选择故事、点击「安装 / 更新」。遇到未知版本或文件冲突会停止并显示原因。
+下载上表对应 ZIP，**关闭游戏并完整解压**，运行 `NarciBloom.exe`／`NarciBloomChinese.exe`（Windows），或在桌面模式运行 `NarciBloom`／`NarciBloomChinese`（SteamOS）。检查游戏根目录、选择故事，点击「安装 / 更新」，完成后从 Steam 启动游戏。
+
+旧版用户也通过新版安装器更新，保留游戏内的 `.narcibloom` 原文件备份；不要手动覆盖汉化或删除记录。遇到未知版本或文件冲突会停止并显示原因。完整步骤与恢复方法见[安装说明](docs/INSTALLATION.md)，文件校验值见发布页的 [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/SHA256SUMS.txt)。
 
 源码仓库不包含游戏本体、剧情文本、语音、CG、汉化原文件或玩家存档。开发者请阅读[构建说明](docs/DEVELOPMENT.md)。
+
+## 验证范围与限制
+
+preview.3 对五作品×三语言共十五组输入完成构建检查；源码检查164项中160项通过、4项按平台条件跳过。Windows 英文1＋2实测44档分页后保存／读取及历史返回，日文 Iris 实测自动等待与连续快进停止；Steam Deck 日文 Iris 实测新存档尾文恢复、设置44和短时满页保护。**构建覆盖十五组输入，不等于十五组都已完成实际游玩。** 具体环境、版本与证据见[兼容性说明](docs/COMPATIBILITY.md)。
+
+新增页内等待时，设置和历史暂不可用；到原生段落停顿后恢复。页内存档不能精确恢复到该页，可能需要重读当前段。旧存档缓存不会自动重写，所有剧情／字体／字号组合及 SteamOS 完整自动播放周期等尚未验证；本轮 SteamOS 的 Space 停止自动播放尝试未通过。当前适合玩家试用与反馈，不作全篇无故障保证。
 
 ## 反馈
 
