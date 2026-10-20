@@ -166,7 +166,11 @@ def default_font(language):
 
 def _prepare_native_engine(executable):
     from chinese_builder import native_dialogs
-    return native_dialogs(executable)
+    from native_fontout import stock_fontout
+    executable, charset_report = stock_fontout(executable)
+    executable, report = native_dialogs(executable)
+    report['script_ui_charset'] = charset_report
+    return executable, report
 
 
 def run_install(game_dir, modules, chinese=False, progress=lambda message: None,
