@@ -30,6 +30,8 @@ In 1+2, open the pause menu → Options → Font / Size. The other stories add s
 
 During an added page break, settings and history are temporarily unavailable to protect pending text. They become available at the game's next natural paragraph pause. Saving at an added page break resumes from the previous native checkpoint, so some text may need to be reread. Since preview.2, the independent window-title field uses each work's complete English name to avoid Windows code-page garbling; story language and save locations are retained. The remaining paging limitations are not full-story compatibility guarantees.
 
+Preview.3 fixes reproduced blank text after saving/loading a paginated paragraph, history return from a long paragraph, and history input ending an automatic page timer early. It also corrects the save/load UI charset in three older Japanese engines. These fixes have targeted checks; existing save caches are not rewritten, and all stories, fonts, sizes and platform combinations have not been played through.
+
 For feedback, include the story and scene, size, game/translation version, OS and Proton version where applicable. Avoid spoilers, personal paths, save uploads and complete game files.
 
 Developers: [setup, APIs and native package builds](docs/DEVELOPMENT.md), [input profiles](docs/source-profiles.json), [version records](docs/VERSIONS.md). Also available: [中文说明](README.md).
