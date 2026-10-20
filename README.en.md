@@ -28,7 +28,7 @@ Check the anthology's game root folder, select the supported stories you own, an
 
 In 1+2, open the pause menu → Options → Font / Size. The other stories add size buttons to their existing settings page. Image-based labels do not scale with story text.
 
-During an added page break, settings and history are temporarily unavailable to protect pending text. They become available at the game's next natural paragraph pause. Saving at an added page break resumes from the previous native checkpoint, so some text may need to be reread. Main-window titles can still be garbled on Chinese Windows; the checked story text, size controls and fixed exit prompts are readable. These are preview limitations, not full-story compatibility guarantees.
+During an added page break, settings and history are temporarily unavailable to protect pending text. They become available at the game's next natural paragraph pause. Saving at an added page break resumes from the previous native checkpoint, so some text may need to be reread. Since preview.2, the independent window-title field uses each work's complete English name to avoid Windows code-page garbling; story language and save locations are retained. The remaining paging limitations are not full-story compatibility guarantees.
 
 For feedback, include the story and scene, size, game/translation version, OS and Proton version where applicable. Avoid spoilers, personal paths, save uploads and complete game files.
 

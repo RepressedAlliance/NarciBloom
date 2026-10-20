@@ -16,7 +16,7 @@ from patch_narcissu_font import archive, entries
 from steam_discovery import discover_installations, inspect_game
 from translation_package import read_package, resource_path, source_notice
 
-VERSION = '0.2.0-preview.1'
+VERSION = '0.2.0-preview.2'
 ARCHIVES = ['scenario.arc', 'fastdata.arc', 'update.arc'] + [f'update{i}.arc' for i in range(1, 12)]
 
 
@@ -82,6 +82,10 @@ def _check_external_overrides(manager, module):
     # Unknown loose scripts take precedence over an ARC and can silently defeat
     # the patch. Do not overwrite an earlier mod without recognizing its input.
     candidates = [folder / 'update12.arc']
+    environments = [path for path in folder.iterdir() if path.name.casefold() == 'majiro.env']
+    if len(environments) > 1:
+        raise InstallError('Conflicting environment filenames: ' + ', '.join(path.name for path in environments))
+    candidates.extend(environments)
     for name in ('#mjo', '#cfg', '#txt'):
         directory = folder / name
         if directory.is_dir():

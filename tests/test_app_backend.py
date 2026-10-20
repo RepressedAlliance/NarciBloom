@@ -151,6 +151,26 @@ class BackendTests(unittest.TestCase):
             backend.run_uninstall(self.game)
         self.assertEqual(override.read_bytes(), b"later-steam-or-user-change")
 
+    def test_loose_environment_cannot_shadow_the_managed_title_without_review(self):
+        self.add_story()
+        environment = put(self.game, "narci_onetwo/MAJIRO.ENV", b"TITLEBAR\tcustom-title\r\n")
+        self.assertFalse(backend.scan_game(self.game)["modules"][0]["supported"])
+        with self.assertRaisesRegex(InstallError, "unrecognized overrides"):
+            backend.run_install(self.game, ["narci_onetwo"])
+        self.assertEqual(environment.read_bytes(), b"TITLEBAR\tcustom-title\r\n")
+
+    def test_case_sensitive_duplicate_environments_are_rejected(self):
+        self.add_story()
+        lower = put(self.game, "narci_onetwo/majiro.env", b"TITLEBAR\tone\r\n")
+        upper = self.game / "narci_onetwo/MAJIRO.ENV"
+        if upper.exists():
+            self.skipTest("Requires a case-sensitive filesystem")
+        upper.write_bytes(b"TITLEBAR\ttwo\r\n")
+        with self.assertRaisesRegex(InstallError, "Conflicting environment filenames"):
+            backend.run_install(self.game, ["narci_onetwo"])
+        self.assertEqual(lower.read_bytes(), b"TITLEBAR\tone\r\n")
+        self.assertEqual(upper.read_bytes(), b"TITLEBAR\ttwo\r\n")
+
     def test_chinese_mode_uses_requested_original_package_and_recovers_stock_on_uninstall(self):
         self.add_story()
         fake = types.SimpleNamespace(build_chinese_payload=lambda module, packed, files, font_family:

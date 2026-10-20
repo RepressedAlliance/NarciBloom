@@ -371,7 +371,9 @@ def original_sources(folder):
 
 def build_overrides(game, files, language='zh-CN', font_family=None):
     """Compile local overrides without reading or writing a game directory."""
-    override={}
+    from window_title import patch_titlebar
+    environment,title_report=patch_titlebar(game,files.get('majiro.env'))
+    override={'majiro.env':environment}
     for name in ['sysdata.cfg','sysdata27.cfg','ナルキ１全画面中央.cfg','プロダクツ用設定.cfg']:
         if name in files:override[name]=config_fonts(files[name],font_family=font_family)
     if game=='narci_onetwo':
@@ -396,6 +398,7 @@ def build_overrides(game, files, language='zh-CN', font_family=None):
     renames=[]
     report={'game':game,
             'menu_language':language,'menu_encoding':MENUS[language]['encoding'],
+            'window_title':title_report,
             'font_family_override':font_family,
             'override_files':list(override),'config_hooks':hooks,'loader_hooks':load_hooks,
             'text_rectangles':rects,'embedded_directory_renames':renames,
