@@ -176,13 +176,15 @@ def _caption_assignment(dll, expected_hash, rva, expected_hex):
     return bytes(result)
 
 
-def native_dialogs(executable):
-    """Return (PE bytes, report) with fixed native UI fields changed to ASCII.
+def native_dialogs(executable, *, chinese=False):
+    """Return (PE bytes, report) with fixed native UI fields made readable.
 
     Applies to the stock Japanese/English engines as well as restored Chinese
-    engines. Replacements stay within existing resource/string fields and never
-    parse or change embedded archives, script text, imports or instruction code.
+    engines. Default replacements stay within existing resource/string fields
+    and never change embedded archives, script text, imports or instruction code.
     This does not identify or replace a title supplied dynamically by a script.
+    The Chinese-only extension localizes fixed Unicode resources and guards
+    known ANSI label overwrites in the five recognized translation engines.
     """
     image = pefile.PE(data=executable, fast_load=True)
     resources = [s for s in image.sections if s.Name.rstrip(b'\0') == b'.rsrc']
@@ -270,8 +272,13 @@ def native_dialogs(executable):
                     continue
                 result[offset:offset + len(needle)] = replacement.ljust(len(needle) - 1, b' ') + b'\0'
                 prompt_changes += 1
-    return bytes(result), {'native_caption_fields': changed, 'native_preview_fields': samples,
-                           'native_prompt_fields': prompt_changes}
+    report = {'native_caption_fields': changed, 'native_preview_fields': samples,
+              'native_prompt_fields': prompt_changes}
+    if chinese:
+        from chinese_native_ui import localize_chinese_native_ui
+        result, localized = localize_chinese_native_ui(executable, baseline=bytes(result))
+        report.update(localized)
+    return bytes(result), report
 
 
 def build_chinese_payload(game, packed_exe_bytes, stock_files, font_family=None) -> ChineseBuild:
@@ -328,7 +335,7 @@ def _build_chinese_sources(game, virtual, executable, stock_files, font_family):
             raise ValueError('required Chinese translation DLL is missing')
         payload[name] = _caption_assignment(payload[name], digest, rva, expected)
         hooks.append({'dll': name, 'rva': rva, 'change': 'preserve original window and child-control captions'})
-    executable, dialogs = native_dialogs(executable)
+    executable, dialogs = native_dialogs(executable, chinese=True)
     report = dict(report, source='PC Chinese v1.1 virtual files', ui_translation_tables=table_reports,
                   caption_hooks=hooks, **dialogs, payload_files=sorted(payload))
     return ChineseBuild(payload, executable, report)
