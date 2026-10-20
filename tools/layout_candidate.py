@@ -155,6 +155,34 @@ def _replace_syscallp(script,inst,function):
     return trampoline
 
 
+def _history_snapshot_redraw(script):
+    """Recognize restoration after history clears its own active-state flag."""
+    start=dict(script.functions)[HISTORY]
+    end=min([o for _,o in script.functions if o>start]+[len(script.code)])
+    body=[i for i in script.ins if start<=i.offset<end]
+    assert IS_HISTORY in dict(script.functions), 'Original is_history getter missing'
+    getter=dict(script.functions)[IS_HISTORY]
+    getter_end=min([o for _,o in script.functions if o>getter]+[len(script.code)])
+    loads=[i for i in script.ins if getter<=i.offset<getter_end and i.name=='ld']
+    assert len(loads)==1 and (loads[0].fields['f']>>5)&7==1, 'Unknown history state getter'
+    flag=loads[0].fields['h']
+    calls=[i for i in body if i.fields.get('h')==CONSOLE_REDRAW
+           and i.name in ('call','callp','syscall','syscallp')]
+    assert calls and all(i.name=='syscallp' and i.fields['a']==1 and len(i.raw)==8
+                         for i in calls), 'Unknown history redraw signature'
+    snapshots=[i for i in calls if body.index(i)>0 and body[body.index(i)-1].name=='ldc.i'
+               and body[body.index(i)-1].fields['i']==-1]
+    assert len(snapshots)==1, 'Expected one history cleanup snapshot redraw'
+    call=snapshots[0]
+    resets=[i for n,i in enumerate(body) if n and i.name=='st.i'
+            and i.fields['h']==flag and (i.fields['f']>>5)&7==1
+            and body[n-1].name=='ldc.i' and body[n-1].fields['i']==0]
+    assert len(resets)==1 and resets[0].offset<call.offset, 'Unknown history cleanup state reset'
+    assert all(i.offset<resets[0].offset for i in calls if i!=call), 'Unknown history cleanup redraw order'
+    return call,{'history_state':flag,'state_reset_offset':resets[0].offset,
+                 'redraw_offset':call.offset,'other_redraw_offsets':[i.offset for i in calls if i!=call]}
+
+
 def _auto_history_cases(instructions):
     auto=[i for i in instructions if i.name=='syscall' and i.fields.get('h')==IS_AUTO_MODE]
     assert len(auto)==2 and all(i.fields['a']==0 for i in auto), 'Unknown automatic wait boundaries'
@@ -291,15 +319,18 @@ def patch_console_pagination(blob):
 def patch_sensitive_menu_entry(blob,target_hash):
     """Guard the shared menu entry, including native shortcut callbacks.
 
-    Both supported stock entries have zero arguments and an integer return.
-    The original body and addresses remain intact; a new function hash names
-    it while the original public hash resolves to the appended wrapper.
+    Stock entries have zero arguments and an integer return. Existing addresses
+    remain intact; a new hash names the body and the public hash names its guard.
+    History's final snapshot redraw also suppresses inserted pagination: history
+    has already cleared is_history at that point, but native replay cannot clear
+    an inserted page. Its variable-index history rendering stays unchanged.
     """
     assert target_hash in (HISTORY,CONFIG_MENU,PAUSE_MENU), 'Unsupported menu entry'
     s=Script(blob)
     start=dict(s.functions)[target_hash]
     prologue=next(i for i in s.ins if i.offset>=start and i.name=='argcheck')
     assert prologue.offset<=start+4 and not prologue.fields['t'], 'Unknown menu arguments'
+    redraw,replay_report=_history_snapshot_redraw(s) if target_hash==HISTORY else (None,None)
     body_hash=hash32('$cdx_page_body_'+format(target_hash,'08x')+'@NARCI_LAYOUT')
     assert body_hash not in dict(s.functions), 'Already guarded menu'
     s.functions=[(body_hash if h==target_hash else h,o) for h,o in s.functions]
@@ -308,5 +339,10 @@ def patch_sensitive_menu_entry(blob,target_hash):
     b.call(body_hash,result=True).op('ret').label('blocked').ret()
     wrapper_start=len(s.code)
     s.add(target_hash,b.finish())
-    return s.finish(),{'target':target_hash,'body':body_hash,'body_offset':start,
-                       'wrapper_offset':wrapper_start,'arguments':0,'new_strings':0}
+    report={'target':target_hash,'body':body_hash,'body_offset':start,
+            'wrapper_offset':wrapper_start,'arguments':0,'new_strings':0}
+    if redraw is not None:
+        replay_report.update({'trampoline_offset':_replace_syscallp(s,redraw,FUNCTIONS['redraw']),
+                              'wrapper':FUNCTIONS['redraw']})
+        report['history_snapshot_replay_guard']=replay_report
+    return s.finish(),report

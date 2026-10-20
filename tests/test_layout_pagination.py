@@ -23,6 +23,8 @@ VOICE_END=0x12340001
 MANUAL_WAIT=0x12340002
 CS=0x12340003
 REMAINING=0x12340004
+HISTORY_FLAG=0x12340005
+HISTORY_INDEX=0x12340006
 
 
 def auto_input_cases(builder,count=2):
@@ -63,8 +65,8 @@ class EngineModel:
 
     def execute(self,function,args=()):
         """Retain call frames/locals across a simulated native redraw yield."""
-        if function==IS_HISTORY:return int(self.history)
-        if function in (HISTORY,CONFIG_MENU):
+        if function==IS_HISTORY and function not in self.code:return int(self.history)
+        if function in (HISTORY,CONFIG_MENU) and function not in self.code:
             self.menu_calls.append(function)
             return 0
         if function==PAGE_WAIT:
@@ -191,6 +193,20 @@ def synthetic_timed_wait():
     return b.finish()
 
 
+def synthetic_history(duplicate_snapshot=False):
+    getter=Builder().prologue().load(HISTORY_FLAG,scope=1).op('ret').finish()
+    b=Builder().prologue().integer(1).store(HISTORY_FLAG,scope=1)
+    if duplicate_snapshot:b.integer(-1)
+    else:b.load(HISTORY_INDEX,scope=1)
+    b.syscall(CONSOLE_REDRAW,1)
+    b.integer(0).store(HISTORY_FLAG,scope=1)
+    body=b.integer(-1).syscall(CONSOLE_REDRAW,1).ret().finish()
+    code=getter+body
+    return (struct.pack('<16sIII',b'MajiroObjV1.000\0',0,1,2)
+            +struct.pack('<II',IS_HISTORY,0)+struct.pack('<II',HISTORY,len(getter))
+            +struct.pack('<I',len(code))+code)
+
+
 def script_with_wait(code):
     return Script(struct.pack('<16sIII',b'MajiroObjV1.000\0',0,1,1)
                   +struct.pack('<II',PAUSE_INTER,0)+struct.pack('<I',len(code))+code)
@@ -246,6 +262,62 @@ class TimedWaitModel:
 
 
 class PaginationTests(unittest.TestCase):
+    def test_history_cleanup_replay_cannot_insert_another_wait(self):
+        original=synthetic_history()
+        patched,report=patch_sensitive_menu_entry(original,HISTORY)
+        results=[]
+        for blob in (original,patched):
+            vm=self.configured()
+            vm.run(FUNCTIONS['wrote'],[123,90,490,100,40,0])
+            script=Script(blob)
+            vm.code.update({h:bytes(script.code[o:]) for h,o in script.functions})
+            vm.variables[(1,HISTORY_INDEX)]=4
+            replay_args=[]
+            def redraw(args):
+                replay_args.append(args)
+                vm.replaying=True
+                try:
+                    # Native replay emits the same overflowing text events as
+                    # ordinary rendering, but ignores console_cls until done.
+                    vm.cursor[1]=1000
+                    vm.run(FUNCTIONS['wrote'],[123,90,534,400,40,1])
+                    vm.run(FUNCTIONS['crlf'])
+                    yield 'native continuation'
+                finally:vm.replaying=False
+            vm.on_redraw=redraw
+            vm.run(HISTORY)
+            self.assertEqual(replay_args,[[4],[-1]])
+            self.assertEqual(vm.variables[(1,HISTORY_FLAG)],0)
+            self.assertEqual(vm.variables.get((1,STATE['busy']),0),0)
+            results.append(vm.pauses)
+        self.assertGreater(results[0],0) # Old cleanup enters PAGE_WAIT mid-replay.
+        self.assertEqual(results[1],0)
+        guard=report['history_snapshot_replay_guard']
+        before=Script(original);after=Script(patched)
+        untouched=guard['other_redraw_offsets'][0]
+        self.assertEqual(before.code[untouched:untouched+8],after.code[untouched:untouched+8])
+        allowed=set(range(guard['redraw_offset'],guard['redraw_offset']+8))
+        self.assertTrue({n for n in range(len(before.code)) if before.code[n]!=after.code[n]}<=allowed)
+        self.assertEqual(report['new_strings'],0)
+
+    def test_unknown_history_cleanup_shapes_are_rejected(self):
+        with self.assertRaisesRegex(AssertionError,'one history cleanup snapshot'):
+            patch_sensitive_menu_entry(synthetic_history(duplicate_snapshot=True),HISTORY)
+        original=synthetic_history();_,report=patch_sensitive_menu_entry(original,HISTORY)
+        guard=report['history_snapshot_replay_guard']
+        for mutation,message in [('argc','history redraw signature'),('result','history redraw signature'),
+                                 ('index','one history cleanup snapshot'),('reset','history cleanup state reset'),
+                                 ('getter','is_history getter missing')]:
+            with self.subTest(mutation=mutation):
+                s=Script(original);site=guard['redraw_offset']
+                if mutation in ('argc','result'):
+                    s.code[site:site+8]=emit('syscall' if mutation=='result' else 'syscallp',CONSOLE_REDRAW,2 if mutation=='argc' else 1)
+                elif mutation=='index':s.code[site-6:site]=emit('ldc.i',0)
+                elif mutation=='reset':
+                    at=guard['state_reset_offset']-6;s.code[at:at+6]=emit('ldc.i',1)
+                else:s.functions=[(0x12349876 if h==IS_HISTORY else h,o) for h,o in s.functions]
+                with self.assertRaisesRegex(AssertionError,message):patch_sensitive_menu_entry(s.finish(),HISTORY)
+
     def test_page_clear_preserves_nested_history_recording_depth(self):
         for depth in (0,1,3):
             with self.subTest(depth=depth):
@@ -510,13 +582,12 @@ class PaginationTests(unittest.TestCase):
     def test_cross_callback_menu_guard_allows_only_natural_wait(self):
         source=synthetic_console()
         # Reuse a zero-argument synthetic function as the public entry.
-        original=Script(source);original.functions=[(HISTORY if h==PAUSE_MENU else h,o) for h,o in original.functions]
-        guarded,report=patch_sensitive_menu_entry(original.finish(),HISTORY)
-        s=Script(guarded);start=dict(s.functions)[HISTORY]
-        vm=EngineModel();vm.code[HISTORY]=bytes(s.code[start:])
+        original=Script(source);original.functions=[(CONFIG_MENU if h==PAUSE_MENU else h,o) for h,o in original.functions]
+        guarded,report=patch_sensitive_menu_entry(original.finish(),CONFIG_MENU)
+        s=Script(guarded);start=dict(s.functions)[CONFIG_MENU]
+        vm=EngineModel();vm.code[CONFIG_MENU]=bytes(s.code[start:])
         body=report['body'];vm.code[body]=Builder().prologue().integer(37).op('ret').finish()
-        # Bypass only the model's normal original-HISTORY shortcut.
-        wrapper=0x12345678;vm.code[wrapper]=vm.code[HISTORY]
+        wrapper=0x12345678;vm.code[wrapper]=vm.code[CONFIG_MENU]
         for busy in (1,0):
             vm.variables[(1,STATE['busy'])]=busy
             self.assertEqual(vm.run(wrapper),0 if busy else 37)
