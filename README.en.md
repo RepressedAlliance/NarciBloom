@@ -2,19 +2,20 @@
 
 Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology Project**, with Steam Deck as the first target.
 
-**Current release: [v0.2.0-preview.3](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.3) · Developer preview.** Targeted checks cover building, installing, restoring and short game scenes; full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
+**Current release: [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4) · Developer preview.** Targeted checks cover building, installing, restoring and short game scenes; full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
 
 - Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
 - Persistent size settings and an optional existing local font family; no font installation or system-locale change.
-- Native font-dialog and menu caption fixes. Some native controls use short English labels; the story language is preserved.
+- Readable native dialogs and menus, with Chinese captions for common controls in supported Chinese installations; some fixed prompts remain in English.
+- Native Chinese punctuation tables match the renderer's encoding, reducing isolated closing punctuation without editing story text.
 - Additional page breaks when a long paragraph exceeds the active text area, without moving the artwork or reducing the selected size.
 
 ## Two packages, one font core
 
 | Package | Purpose | Windows | SteamOS / Steam Deck |
 |---|---|---|---|
-| **Fonts** | Keep recognized Japanese, English or supported Chinese story text. No translation included or required. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-Windows-x64-Fonts.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-SteamOS-Linux-x64-Fonts.zip) |
-| **Chinese** | Includes prepared PC v1.1 translation inputs and credits; font changes are generated locally with the same core. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-Windows-x64-Chinese.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/NarciBloom-0.2.0-preview.3-SteamOS-Linux-x64-Chinese.zip) |
+| **Fonts** | Keep recognized Japanese, English or supported Chinese story text. No translation included or required. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-Windows-x64-Fonts.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-SteamOS-Linux-x64-Fonts.zip) |
+| **Chinese** | Includes prepared PC v1.1 translation inputs and credits; font changes are generated locally with the same core. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-Windows-x64-Chinese.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-SteamOS-Linux-x64-Chinese.zip) |
 
 Only the recorded Steam anthology versions and PC v1.1 Chinese translation are recognized. Other editions, translation builds and the separate free *Narcissu 1st & 2nd* release are outside this scope. The installer lists stories actually installed on your machine; it does not download the game or DLC.
 
@@ -26,7 +27,7 @@ Close the game, extract the complete package, then open its native launcher: `Na
 
 Check the anthology's game root folder, select the supported stories you own, and choose **Install / Update**. The Chinese launcher detects its accompanying prepared ZIP; the recognized original RAR is also accepted. **Uninstall & Restore** uses the originals retained in the game's `.narcibloom` folder; keep that folder. Later changes by Steam or another mod are reported as conflicts instead of silently overwritten. Personal saves are protected. See the [installation and recovery guide](docs/INSTALLATION.md).
 
-Existing preview installations can use the new installer to update. Keep the `.narcibloom` record and backups; do not overwrite the translation manually. Release checksums are in [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.3/SHA256SUMS.txt).
+Existing preview installations can use the new installer to update. Keep the `.narcibloom` record and backups; do not overwrite the translation manually. Release checksums are in [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/SHA256SUMS.txt).
 
 In 1+2, open the pause menu → Options → Font / Size. The other stories add size buttons to their existing settings page. Image-based labels do not scale with story text.
 
@@ -36,7 +37,7 @@ Preview.3 fixes reproduced blank text after saving/loading a paginated paragraph
 
 ## What has been checked
 
-All fifteen supported story/language combinations build; 160 of 164 source checks passed, with four platform skips. Runtime samples include Windows English 1+2 size44 save/load and history return, Japanese Iris automatic waits and stopping continuous skip, plus Steam Deck Japanese Iris tail-save restoration, size44 settings and a short full-page history-input check. Build coverage does not mean all fifteen combinations have been played. SteamOS full automatic cycles and all skip interactions remain unverified; the sampled Space cancellation did not stop auto mode. See the [exact scope and remaining limits](docs/COMPATIBILITY.md).
+Preview.4 passes 174 of 178 source checks, with four platform skips. Five complete Chinese builds and ten unchanged Japanese/English native-UI outputs were checked. Windows Chinese 1+2 size44 has an actual punctuation-wrapping comparison; native Chinese volume controls were checked on Windows and Steam Deck. Earlier build, save/load, history, auto-wait and skip evidence remains separately documented. These samples do not establish full-story or all-font coverage. See the [exact scope and remaining limits](docs/COMPATIBILITY.md).
 
 For feedback, include the story and scene, size, game/translation version, OS and Proton version where applicable. Avoid spoilers, personal paths, save uploads and complete game files.
 

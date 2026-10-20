@@ -16,7 +16,7 @@ from patch_narcissu_font import archive, entries
 from steam_discovery import discover_installations, inspect_game
 from translation_package import read_package, resource_path, source_notice
 
-VERSION = '0.2.0-preview.3'
+VERSION = '0.2.0-preview.4'
 ARCHIVES = ['scenario.arc', 'fastdata.arc', 'update.arc'] + [f'update{i}.arc' for i in range(1, 12)]
 
 
