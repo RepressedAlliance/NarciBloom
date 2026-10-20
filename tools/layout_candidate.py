@@ -24,6 +24,7 @@ CONFIG_MENU = hash32('$config_menu@CONFIG')
 SAVE_POINT = 0xF8004993
 DO_AUTOSAVE = hash32('$do_autosave@LOADSAVE')
 IS_HISTORY = hash32('$is_history@HISTORY')
+IS_AUTO_MODE = 0xC21F8B49
 CON_MODE = hash32('@con_mode@CONSOLE')
 
 STATE = {name:hash32('@cdx_page_'+name+'@NARCI_LAYOUT')
@@ -102,6 +103,16 @@ def pagination_functions():
     return output
 
 
+def _auto_history_cases(instructions):
+    auto=[i for i in instructions if i.name=='syscall' and i.fields.get('h')==IS_AUTO_MODE]
+    assert len(auto)==2 and all(i.fields['a']==0 for i in auto), 'Unknown automatic wait boundaries'
+    cases=[i for n,i in enumerate(instructions[:-1])
+           if auto[0].offset<i.offset<auto[1].offset and i.name=='ldc.i'
+           and i.fields['i']==8 and instructions[n+1].name=='bne.case']
+    assert len(cases)==2, 'Expected two automatic history input cases'
+    return cases
+
+
 def clone_page_wait(script,function=PAUSE_INTER):
     """Retain native input behavior without changing the natural save point.
 
@@ -150,6 +161,12 @@ def clone_page_wait(script,function=PAUSE_INTER):
         removed.append({'offset':ins.offset,'function':ins.fields['h']})
     if function==PAUSE_INTER:
         assert {SAVE_POINT,DO_AUTOSAVE}<={r['function'] for r in removed}, 'Expected native save/autosave calls'
+        instructions=[i for i in script.ins if start<=i.offset<end]
+        for case in _auto_history_cases(instructions):
+            # Removing only the history call still exits the automatic timer.
+            # Ignore this input before its voice-end/early-return path instead;
+            # the other cases retain the native timer, cancel and skip behavior.
+            code[case.offset-start:case.offset-start+len(case.raw)]=emit('ldc.i',0x7FFFFFFF)
     return bytes(code),removed
 
 
@@ -164,6 +181,8 @@ def patch_console_pagination(blob):
     assert PAUSE_INTER in {h for h,_ in s.functions}, 'Original pause_inter function missing'
     assert not ((set(FUNCTIONS.values())|{PAGE_WAIT,PAGE_MENU}) & {h for h,_ in s.functions}), 'Already patched pagination candidate'
     wait_code,removed=clone_page_wait(s)
+    auto_history_cases=_auto_history_cases(Script.parse(bytes(s.original[
+        dict(s.functions)[PAUSE_INTER]:dict(s.functions)[PAUSE_INTER]+len(wait_code)])))
     menu_code,menu_removed=(clone_page_wait(s,PAUSE_MENU)
                             if PAUSE_MENU in dict(s.functions) else (None,[]))
     registrations=[]
@@ -201,6 +220,7 @@ def patch_console_pagination(blob):
             'save_behavior':'inserted waits retain preceding natural paragraph save point; no exact mid-page resume',
             'cloned_wait_removed_calls':removed,
             'cloned_menu_removed_calls':menu_removed,
+            'auto_history_input_cases': [dict(s.functions)[PAUSE_INTER]+i.offset for i in auto_history_cases],
             'translation_source_aliases':aliases,
             'inserted_wait_restrictions':'history and config ignored until natural paragraph wait; both replace pending text',
             'busy_state':'SAVEFILE shared across callbacks; inserted waits never create save checkpoints; natural checkpoint must retain zero',

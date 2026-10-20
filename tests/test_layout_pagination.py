@@ -5,11 +5,32 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from build_font_settings import Builder,Script,SIZES
+from build_font_settings import Builder,Script,SIZES,emit
 from layout_candidate import (FUNCTIONS,STATE,CON_MODE,IS_HISTORY,PAUSE_INTER,PAGE_WAIT,PAGE_MENU,PAUSE_MENU,HISTORY,CONFIG_MENU,SAVE_POINT,DO_AUTOSAVE,
                               CONSOLE_SET,CURSOR_Y,FONT_HEIGHT,LOCATE_FORCE,
                               CONSOLE_CLEAR,CLIENT_HEIGHT,EVENT_HOOK,EVENT_AFTER,pagination_functions,
-                              patch_console_pagination,patch_sensitive_menu_entry)
+                              patch_console_pagination,patch_sensitive_menu_entry,
+                              clone_page_wait,IS_AUTO_MODE,_auto_history_cases)
+
+MK_READ=0x892E9B20
+VOICE_STAT=0xD0C1FAEB  # Synthetic boundary; the model does not emulate native audio.
+WAIT=0xCF35F0E3
+IS_FAST_MODE=0xA62AA5EB
+SET_AUTO_MODE=0xFAC4F361
+RESET_FAST_MODE=0x818A4B92
+VOICE_END=0x12340001
+MANUAL_WAIT=0x12340002
+CS=0x12340003
+REMAINING=0x12340004
+
+
+def auto_input_cases(builder,count=2):
+    """Structural auto region for the existing geometry-only fixture."""
+    builder.syscall(IS_AUTO_MODE,0,result=True).op('pop')
+    for n in range(count):
+        builder.integer(0).op('br.case',0).integer(8).branch('bne.case','auto_case_'+str(n))
+        builder.label('auto_case_'+str(n))
+    return builder.syscall(IS_AUTO_MODE,0,result=True).op('pop')
 
 
 class EngineModel:
@@ -93,7 +114,9 @@ def synthetic_console(existing_after=False,external_case=False):
     b.syscall(CONSOLE_SET,5).ret()
     first=b.finish()
     p=(Builder().prologue().text('checkpoint').syscall(SAVE_POINT,1)
-       .branch('br','end').call(DO_AUTOSAVE).call(HISTORY).call(CONFIG_MENU))
+       .branch('br','end'))
+    auto_input_cases(p)
+    p.call(DO_AUTOSAVE).call(HISTORY).call(CONFIG_MENU)
     if external_case:p.integer(0).op('br.case',0).integer(-2).branch('bne.case','end')
     pause=p.call(PAUSE_MENU,result=True).op('pop').call(PAUSE_MENU).label('end').ret().finish()
     menu=Builder().prologue().call(HISTORY).call(CONFIG_MENU).ret().finish()
@@ -104,7 +127,156 @@ def synthetic_console(existing_after=False,external_case=False):
             +struct.pack('<I',len(code))+code)
 
 
+def synthetic_timed_wait():
+    """Two polled auto loops and common history/cancel exit, like stock waits."""
+    b=Builder('cp932').prologue().text('checkpoint').syscall(SAVE_POINT,1).call(DO_AUTOSAVE)
+    b.syscall(IS_AUTO_MODE,0,result=True).branch('brfalse','normal')
+    b.integer(0).store(CS,scope=3)
+    b.syscall(VOICE_STAT,0,result=True).branch('brfalse','timer_start')
+    b.label('voice_loop').syscall(VOICE_STAT,0,result=True).branch('brfalse','voice_done')
+    for phase in ('voice','timer'):
+        if phase=='timer':
+            b.label('voice_done').call(VOICE_END).label('timer_start')
+            b.integer(150).store(REMAINING,scope=3)
+            b.label('timer_loop').load(REMAINING,scope=3).integer(0).op('cgt.i').branch('brfalse','finish')
+        b.syscall(MK_READ,0,result=True).op('br.case',0)
+        b.integer(8).branch('bne.case',phase+'_cancel').integer(1).store(CS,scope=3)
+        if phase=='voice':b.call(VOICE_END)
+        b.branch('br','finish').label(phase+'_cancel')
+        b.integer(16).branch('bne.case',phase+'_tick').integer(2).store(CS,scope=3)
+        if phase=='voice':b.call(VOICE_END)
+        b.branch('br','finish').label(phase+'_tick').integer(50).syscall(WAIT,1)
+        if phase=='timer':b.load(REMAINING,scope=3).integer(50).op('sub.i').store(REMAINING,scope=3)
+        b.branch('br',phase+'_loop')
+    b.label('finish').load(CS,scope=3).integer(1).op('ceq.i').branch('brfalse','cancel_check')
+    b.call(HISTORY).syscall(SET_AUTO_MODE,0)
+    b.label('cancel_check').load(CS,scope=3).integer(2).op('ceq.i').branch('brfalse','auto_check')
+    b.syscall(RESET_FAST_MODE,0)
+    b.label('auto_check').syscall(IS_AUTO_MODE,0,result=True).branch('brfalse','normal').ret()
+    b.label('normal').syscall(IS_FAST_MODE,0,result=True).branch('brfalse','manual')
+    b.integer(0).syscall(WAIT,1).ret().label('manual').call(MANUAL_WAIT).ret()
+    return b.finish()
+
+
+def script_with_wait(code):
+    return Script(struct.pack('<16sIII',b'MajiroObjV1.000\0',0,1,1)
+                  +struct.pack('<II',PAUSE_INTER,0)+struct.pack('<I',len(code))+code)
+
+
+class TimedWaitModel:
+    """Executes test bytecode/branches; not native scheduling or rendering."""
+    def __init__(self,auto=True,fast=False,voice_ticks=0,inputs=None):
+        self.auto=auto;self.fast=fast;self.voice_ticks=voice_ticks
+        self.inputs={name:iter(values) for name,values in (inputs or {}).items()}
+        self.phase='timer';self.elapsed=0;self.waits=[];self.history=0;self.manual=0;self.voice_end=0
+
+    def run(self,code):
+        lookup={i.offset:i for i in Script.parse(code)}
+        stack=[];variables={};pc=0;selector=None
+        for _ in range(2000):
+            i=lookup[pc];pc+=len(i.raw);n=i.name;f=i.fields
+            if n in ('argcheck','alloca'):pass
+            elif n=='ldc.i':stack.append(f['i'])
+            elif n=='ldstr':stack.append(f['s'])
+            elif n=='ld':stack.append(variables.get(f['h'],0))
+            elif n=='st.i':variables[f['h']]=stack[-1]
+            elif n=='pop':stack.pop()
+            elif n in ('sub.i','cgt.i','ceq.i'):
+                right,left=stack.pop(),stack.pop()
+                stack.append(left-right if n=='sub.i' else int(left>right) if n=='cgt.i' else int(left==right))
+            elif n=='br.case':selector=stack.pop();pc+=f['j']
+            elif n=='bne.case':
+                if selector!=stack.pop():pc+=f['j']
+            elif n in ('br','brfalse','brtrue'):
+                if n=='br' or bool(stack.pop())==(n=='brtrue'):pc+=f['j']
+            elif n in ('call','callp','syscall','syscallp'):
+                args=[stack.pop() for _ in range(f['a'])];h=f['h'];result=0
+                if h==IS_AUTO_MODE:result=int(self.auto)
+                elif h==IS_FAST_MODE:result=int(self.fast)
+                elif h==VOICE_STAT:
+                    result=int(self.voice_ticks>0);self.phase='voice' if result else 'timer'
+                elif h==MK_READ:result=next(self.inputs.get(self.phase,iter(())),0)
+                elif h==WAIT:
+                    self.waits.append(args[0]);self.elapsed+=args[0]
+                    if self.phase=='voice':self.voice_ticks=max(0,self.voice_ticks-1)
+                elif h==SET_AUTO_MODE:self.auto=True
+                elif h==RESET_FAST_MODE:self.auto=self.fast=False
+                elif h==HISTORY:self.history+=1
+                elif h==MANUAL_WAIT:self.manual+=1
+                elif h==VOICE_END:self.voice_end+=1
+                elif h not in (SAVE_POINT,DO_AUTOSAVE):raise AssertionError(hex(h))
+                if n in ('call','syscall'):stack.append(result)
+            elif n=='ret':
+                result=stack.pop();assert not stack;return result
+            else:raise AssertionError(n)
+        raise AssertionError('wait bytecode did not terminate')
+
+
 class PaginationTests(unittest.TestCase):
+    def test_auto_history_input_retains_both_voice_and_timer_waits(self):
+        original=synthetic_timed_wait();script=script_with_wait(original)
+        fixed,_=clone_page_wait(script)
+        # Reconstruct the previous released clone, whose history call was
+        # removed but whose input case still exited the timer immediately.
+        legacy=bytearray(fixed)
+        for case in _auto_history_cases(script.ins):
+            legacy[case.offset:case.offset+len(case.raw)]=case.raw
+        for phase,voice_ticks,expected_ms in [('timer',0,150),('voice',3,300)]:
+            with self.subTest(phase=phase):
+                old=TimedWaitModel(voice_ticks=voice_ticks,inputs={phase:[8]})
+                old.run(legacy)
+                self.assertEqual((old.elapsed,old.history,old.manual),(0,0,0))
+                new=TimedWaitModel(voice_ticks=voice_ticks,inputs={phase:[8]})
+                new.run(fixed)
+                baseline=TimedWaitModel(voice_ticks=voice_ticks)
+                baseline.run(original)
+                self.assertEqual(new.elapsed,expected_ms)
+                self.assertEqual((new.waits,new.voice_end,new.auto),
+                                 (baseline.waits,baseline.voice_end,baseline.auto))
+                self.assertEqual((new.history,new.manual),(0,0))
+        self.assertEqual(bytes(script.code),original)
+
+    def test_auto_cancel_and_fast_return_still_follow_native_paths(self):
+        original=synthetic_timed_wait();fixed,_=clone_page_wait(script_with_wait(original))
+        for phase,ticks in [('timer',0),('voice',3)]:
+            states=[]
+            for code in (original,fixed):
+                vm=TimedWaitModel(voice_ticks=ticks,inputs={phase:[16]});vm.run(code)
+                states.append((vm.elapsed,vm.manual,vm.auto,vm.voice_end,vm.history))
+            self.assertEqual(states[0],states[1])
+            self.assertEqual(states[1][:3],(0,1,False))
+        for code in (original,fixed):
+            vm=TimedWaitModel(auto=False,fast=True);vm.run(code)
+            self.assertEqual((vm.waits,vm.elapsed,vm.manual),([0],0,0))
+
+    def test_auto_history_change_is_only_two_equal_length_case_operands(self):
+        original=synthetic_timed_wait();s=script_with_wait(original)
+        fixed,_=clone_page_wait(s);cases=_auto_history_cases(s.ins)
+        # Every branch and instruction address survives, including timer,
+        # voice, cancellation and fast paths outside the two comparisons.
+        before={i.offset:i for i in s.ins};after={i.offset:i for i in Script.parse(fixed)}
+        self.assertTrue(before.keys()<=after.keys())
+        for offset,i in before.items():
+            if 'j' in i.fields:self.assertEqual(i.raw,after[offset].raw)
+        self.assertEqual([after[i.offset].fields['i'] for i in cases],[0x7fffffff]*2)
+        # The same body cloned as PAGE_MENU must not receive this rule.
+        s.functions=[(PAUSE_MENU,0)]
+        menu,_=clone_page_wait(s,PAUSE_MENU)
+        self.assertEqual([i.fields['i'] for i in _auto_history_cases(Script.parse(menu))],[8,8])
+
+    def test_unknown_auto_wait_shapes_are_rejected(self):
+        for count in (0,1,3):
+            with self.subTest(count=count):
+                code=auto_input_cases(Builder().prologue(),count).ret().finish()
+                with self.assertRaisesRegex(AssertionError,'two automatic history'):
+                    _auto_history_cases(Script.parse(code))
+        s=script_with_wait(synthetic_timed_wait())
+        case=_auto_history_cases(s.ins)[0]
+        s.code[case.offset:case.offset+len(case.raw)]=emit('ldc.i',9)
+        malformed=script_with_wait(s.code)
+        with self.assertRaisesRegex(AssertionError,'two automatic history'):
+            clone_page_wait(malformed)
+
     def configured(self,size=44,mode=4,history=False):
         vm=EngineModel(size,mode,history)
         vm.run(FUNCTIONS['set'],[123,90,490,690,88])
