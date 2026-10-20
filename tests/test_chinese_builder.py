@@ -166,6 +166,8 @@ class ChineseBuilderTests(unittest.TestCase):
                    'Narcissu_cn.dll': b'dll', 'update.arc': archive({'unrelated': b'original bytes'})}
         patched = add_menu(original)
         overrides = {'config.mjo': patched, 'console.mjo': original, 'load_sysdata.mjo': original}
+        from tests.test_native_kinsoku import environment
+        overrides['majiro.env'] = environment()
         stock = {'config.mjo': original, 'console.mjo': original, 'load_sysdata.mjo': original}
         with patch.object(chinese, 'extract_virtual_files', return_value=virtual) as extraction, \
              patch.object(chinese, 'restore_virtual_pe', return_value=b'PE') as restoration, \
@@ -184,7 +186,10 @@ class ChineseBuilderTests(unittest.TestCase):
         self.assertEqual(result.payload['Narcissu_cn.dll'], b'patched dll')
         generated = entries(result.payload['update12.arc'])
         for name in overrides:
-            self.assertEqual(result.payload['#mjo/' + name], generated[name][2])
+            if name.endswith('.mjo'):
+                self.assertEqual(result.payload['#mjo/' + name], generated[name][2])
+        self.assertEqual(result.report['kinsoku']['encoding'], 'gbk')
+        self.assertNotEqual(generated['majiro.env'][2], overrides['majiro.env'])
         self.assertEqual(result.payload['#txt/config.txt'].decode('utf-16').splitlines(), ['菜单', '返回', '字号：'])
 
     def test_prepared_module_mismatch_fails_before_building(self):
@@ -202,6 +207,8 @@ class ChineseBuilderTests(unittest.TestCase):
                    'Narcissu_cn.dll': b'dll'}
         stock = {name: original for name in ('config.mjo', 'console.mjo', 'load_sysdata.mjo')}
         overrides = dict(stock, **{'console.mjo': patched})
+        from tests.test_native_kinsoku import environment
+        overrides['majiro.env'] = environment()
         report = {'pagination': {'translation_source_aliases': aliases}}
         with patch.object(chinese, 'extract_virtual_files', return_value=virtual), \
              patch.object(chinese, 'restore_virtual_pe', return_value=b'PE'), \

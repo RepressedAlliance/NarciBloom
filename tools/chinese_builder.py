@@ -306,6 +306,9 @@ def _build_chinese_sources(game, virtual, executable, stock_files, font_family):
     """Apply the same font/UI changes to raw and prepared source bytes."""
     effective = effective_chinese_sources(stock_files, virtual)
     overrides, report, _functions, _hashes = build_overrides(game, effective, 'zh-CN', font_family)
+    from native_kinsoku import chinese_kinsoku_env
+    overrides['majiro.env'], kinsoku = chinese_kinsoku_env(overrides['majiro.env'])
+    report = dict(report, kinsoku=kinsoku)
     payload = dict(virtual)
     table_reports = {}
     for name, patched in list(overrides.items()):
