@@ -2,12 +2,13 @@
 
 Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology Project**, with Steam Deck as the first target.
 
-**Current release: [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4) · Developer preview.** Targeted checks cover building, installing, restoring and short game scenes; full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
+**Source version: 0.2.0-preview.5 · Preparing for release.** Published downloads below remain [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4); preview.5 has not been released or applied to the formal Deck installation. Full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
 
 - Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
 - Persistent size settings and an optional existing local font family; no font installation or system-locale change.
 - Readable native dialogs and menus, with Chinese captions for common controls in supported Chinese installations; some fixed prompts remain in English.
 - Native Chinese punctuation tables match the renderer's encoding, reducing isolated closing punctuation without editing story text.
+- A Chinese paragraph ending with one Han character and closing punctuation can borrow at most one preceding Han character when the measured width fits. Extra leading ASCII spaces have zero display advance; U+3000 spaces use half their native width. Translation bytes, full-width punctuation and spaces within English sentences are retained. This does not provide language segmentation or English whole-word protection.
 - Additional page breaks when a long paragraph exceeds the active text area, without moving the artwork or reducing the selected size.
 
 ## Two packages, one font core
@@ -37,7 +38,7 @@ Preview.3 fixes reproduced blank text after saving/loading a paginated paragraph
 
 ## What has been checked
 
-Preview.4 passes 174 of 178 source checks, with four platform skips. Five complete Chinese builds and ten unchanged Japanese/English native-UI outputs were checked. Windows Chinese 1+2 size44 has an actual punctuation-wrapping comparison; native Chinese volume controls were checked on Windows and Steam Deck. Earlier build, save/load, history, auto-wait and skip evidence remains separately documented. These samples do not establish full-story or all-font coverage. See the [exact scope and remaining limits](docs/COMPATIBILITY.md).
+Preview.5 core source CI passed: 181 of 185 checks pass, with four platform skips and six new native-display tests. Five actual Chinese builds and ten read-only Japanese/English builds passed; the latter do not invoke the Chinese layout adapter. All three engine families have real 32-bit ABI harness checks. This round's SteamOS runtime sample covers only Chinese 1+2 at size44: the final candidate's short-tail comparison, history open/return and unchanged single-character answer. Shared support for five engines does not establish five-story runtime, all-size or full-story coverage. Earlier runtime evidence remains separately documented. See the [exact scope and remaining limits](docs/COMPATIBILITY.md).
 
 For feedback, include the story and scene, size, game/translation version, OS and Proton version where applicable. Avoid spoilers, personal paths, save uploads and complete game files.
 

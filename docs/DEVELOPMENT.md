@@ -58,6 +58,10 @@ Windows 和 SteamOS 使用各自的原生入口。SteamOS 安装器在桌面模�
 
 `native_layout.patch_chinese_native_layout(original_restored, baseline=localized_engine)` 仅识别五个固定PC v1.1恢复引擎；日英路径不调用它。原始引擎用于身份检查，已本地化的同结构PE用于追加自有RX代码段和已核实的相对调用／跳转。保留导入、重定位、入口及原取行调用次数；三个布局分别适配，不将1＋2的栈协议套到其他篇章。
 
+显示规则仅作用于中文：普通段末单字加收尾标点最多回借一个CJK字，必须实际测宽可容纳；行首额外U+0020显示advance为零，U+3000为原advance向上取整的一半。全角标点、英文句内空格与译文字节保留，不实现中文分词或英文整词保护。GBK禁则另包含全角波浪号“～”。
+
+preview.5核心源码CI通过，185项检查中181项通过、4项平台跳过，含新增6项原生检查。三个ABI族使用真实32位执行harness核对调用协议与不同加载地址，不替代GDI或游戏实测。五部真实中文构建核对315份有效剧情脚本（含110份松散脚本）和110份原译表字节保留；十组日英只读构建未调用此适配。SteamOS仅中文1＋2最终候选完成44档短尾、空白、历史返回与单字回答有限抽样。
+
 自有C源码为 `native_layout_tail.c` 与 `native_layout_spacing.c`，`native_layout_generated.py` 保存无CRT／外部符号／数据重定位的32位代码及源指纹，`native_layout_x86.py` 生成位置无关的调用桥。安装器只需要原有Python依赖，不调用编译器。维护者可用Zig 0.16.0在不读取游戏的情况下核对生成物：
 
 ```sh

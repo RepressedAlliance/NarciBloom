@@ -2,7 +2,7 @@
 
 NarciBloom 为 Steam《Narcissu 10th Anniversary Anthology Project》（应用 ID `426690`）提供可调字号。当前安装包属于开发预览：自动识别、安装与恢复检查不等于逐章游玩验证，具体范围见[兼容性说明](COMPATIBILITY.md)。免费版《Narcissu 1st & 2nd》是另一款游戏，不适用本安装器。
 
-当前版本为 [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4)，提供 Windows／SteamOS 各一份 Fonts 和 Chinese ZIP；[首页下载表](../README.md#两种安装包)可直接选择。Windows 入口为 `NarciBloom.exe`／`NarciBloomChinese.exe`，SteamOS 入口为 `NarciBloom`／`NarciBloomChinese`。
+源码版本0.2.0-preview.5正在准备发布，尚未更新正式Deck安装。当前已发布版本为 [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4)，提供 Windows／SteamOS 各一份 Fonts 和 Chinese ZIP；[首页下载表](../README.md#两种安装包)可直接选择。Windows 入口为 `NarciBloom.exe`／`NarciBloomChinese.exe`，SteamOS 入口为 `NarciBloom`／`NarciBloomChinese`。
 
 ## 选择安装包
 
@@ -34,9 +34,11 @@ NarciBloom 为 Steam《Narcissu 10th Anniversary Anthology Project》（应用 I
 
 大字号的长段可能分成数页，点击继续阅读。**新增的页内停顿期间，设置和历史记录暂不可用**；读完当前段、到达原游戏的正常停顿点后恢复。在新增分页处保存，读档会回到之前的原生停顿点，可能需要重读当前段，不能精确恢复到该页。
 
+preview.5的中文显示层对普通段末的单字加收尾标点，最多从前行借一个汉字，且必须实际测宽可容纳。多余行首半角空格不占位，U+3000全角空白显示为原宽度的一半；不改译文字节、全角标点或英文句内空格。这不是中文分词或英文整词保护，长英文词仍可能拆行。本轮SteamOS仅中文1＋2在44档完成有限实测，其他模块与字号尚未全面验证。
+
 preview.2 起标题栏使用完整英文作品名，以避免系统编码造成的乱码，剧情语言保持不变。预览版的实际验证范围及剩余限制见[兼容性说明](COMPATIBILITY.md)。请按自己的阅读习惯选择字号；遇到异常时记录故事、场景与字号反馈。
 
-preview.4 修正已复现的分页自然尾页读档空白、长段历史返回卡住、自动分页提前结束及部分旧日文存读档界面乱码。更新不会重写旧存档缓存，也不取消上述精确页内恢复限制。尚未覆盖全部文本和平台交互，不能将这几个修正视为所有存读档场景通过。
+此前预览版已修正复现的分页自然尾页读档空白、长段历史返回卡住、自动分页提前结束及部分旧日文存读档界面乱码。更新不会重写旧存档缓存，也不取消上述精确页内恢复限制。尚未覆盖全部文本和平台交互，不能将这几个修正视为所有存读档场景通过。
 
 ## SteamOS / Steam Deck
 
