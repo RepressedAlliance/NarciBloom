@@ -21,7 +21,7 @@
 - [x] 发布 Windows／SteamOS 原生四包及校验清单，记录干净安装与卸载的实际范围。
 - [x] preview.3 修复已复现的自动分页提前结束、自然尾页读档空白、历史返回卡住及旧日文存读档界面乱码。
 
-当前已发布版本：[v0.2.0-preview.5](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.5)。源码与安装检查、实际场景和未验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。这些完成项不表示全篇或全部平台组合已验收。
+当前已发布版本：[v0.2.0-preview.6](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.6)。源码与安装检查、实际场景和未验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。这些完成项不表示全篇或全部平台组合已验收。
 
 ## 已完成：preview.5 发布（2026-10-22）
 
@@ -35,7 +35,8 @@
 ## 后续验证与稳定版
 
 - [x] preview.6源码：从原生闭标点回退相位及ASCII测宽差异定位原因，使用通用词边界选择替换有限单字尾行兜底；见[根因与验证](LAYOUT.md)。
-- [ ] preview.6玩家包与实际场景回归；运行中的游戏不热更新。
+- [x] preview.6四包及校验清单发布；两平台安装器字体／中文视图在CI启动检查通过。
+- [ ] preview.6实际游戏场景回归；运行中的游戏不热更新。
 - [ ] 逐章记录 1＋2、姬子后日谈、Iris、Zero、Sumire 的实际使用反馈。
 - [ ] 检查最长段落、历史记录、特殊字体与演出。
 - [ ] 补充尚未覆盖的平台／语言交互，尤其 SteamOS 完整自动播放周期、快进停止和长段历史返回。
