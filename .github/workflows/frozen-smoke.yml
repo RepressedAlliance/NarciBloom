@@ -1,0 +1,80 @@
+name: Frozen package startup
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Player packages run to verify (no rebuild)
+        required: true
+        default: '39621107605'
+        type: string
+      source_revision:
+        description: Exact clean source revision embedded in that package
+        required: true
+        default: '19064a3623d8c152e6d7c9032fa51b67bb7de1cf'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  startup:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      PACKAGE_RUN: ${{ inputs.run_id }}
+      PACKAGE_SOURCE: ${{ inputs.source_revision }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v7
+        with:
+          name: NarciBloom-${{ matrix.os }}
+          path: packages
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+      - name: Verify and extract the existing package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python tools/check_frozen_package.py --packages packages --output probe
+          --source-revision "$PACKAGE_SOURCE" --run-id "$PACKAGE_RUN"
+          --repository "$GITHUB_REPOSITORY" --report reports/package.json
+        shell: bash
+      - name: Install virtual display tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth x11-utils
+      - name: Start the frozen Linux GUI in a virtual display
+        if: runner.os == 'Linux'
+        run: |
+          launcher_path="$(python -c 'import json; print(json.load(open("reports/package.json"))["package"]["launcher"])')"
+          result=0
+          for mode in font chinese; do
+            xvfb-run -a python tools/check_frozen_startup.py "$launcher_path" \
+              --mode "$mode" --report "reports/startup-$mode.json" || result=1
+          done
+          exit "$result"
+      - name: Start the frozen Windows GUI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $launcherPath = (Get-Content -LiteralPath reports/package.json -Raw | ConvertFrom-Json).package.launcher
+          $failed = $false
+          foreach ($mode in @('font', 'chinese')) {
+            python tools/check_frozen_startup.py $launcherPath --mode $mode --report "reports/startup-$mode.json"
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: Frozen-startup-${{ matrix.os }}
+          path: reports/
+          if-no-files-found: warn
