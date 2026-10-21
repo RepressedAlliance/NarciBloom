@@ -94,6 +94,8 @@ python tools/build_font_settings.py --game narci_iris --menu-language ja --font-
 
 ## 构建原生预览包
 
+词表再生与真实x86无界面验证入口见 [LAYOUT.md](LAYOUT.md)。`tools/build_native_lexicon.py`只供维护者使用；玩家安装器使用已固定的数据，不下载或运行分词工具。
+
 已发布的preview.5四包以干净提交 `6d7000e597c0c0ca9a7dd25ba01964167209e4cb` 为构建基线，发布附件的大小与摘要已核对。后续文档提交不代表重新生成附件；实际构建版本以包内构建信息为准。
 
 在对应平台的 x64 构建主机上安装打包依赖：

@@ -8,6 +8,8 @@
 
 [English](README.en.md) · [兼容性与测试范围](docs/COMPATIBILITY.md) · [开发与构建](docs/DEVELOPMENT.md) · [后续计划](docs/ROADMAP.md) · [更新记录](CHANGELOG.md)
 
+源码preview.6正在准备发布：针对闭标点簇、拆词及取行／测宽差异作进一步修正，详见[根因与验证](docs/LAYOUT.md)。下方下载仍是preview.5，尚不包含这些新修正。
+
 ## 做了什么
 
 - 游戏内选择 **24 / 28 / 32 / 36 / 40 / 44** 六档字号，显示当前档位，默认 36。

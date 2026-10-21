@@ -45,7 +45,7 @@ class X86:
             struct.pack_into('<i', self.b, at, dest - (self.rva + at + 4))
         return bytes(self.b)
 
-def _payload_onetwo(rva, core, policy):
+def _payload_onetwo(rva, core, policy, lexicon):
     # ECX rect + cdecl(out, flags, status*). Save native return state only
     # AFTER that one original call, so the C postprocessor is transparent.
     a = X86(rva)
@@ -73,7 +73,9 @@ def _payload_onetwo(rva, core, policy):
     a.pad()
     a.label('profile')
     profile_offset = len(a.b)
-    a.d(1276296).d(rva + a.labels['measure_wrapper']).d(281760).d(281952).d(938408).pad()
+    a.d(1276296).d(rva + a.labels['measure_wrapper']).d(281760).d(281952).d(938408)
+    lexicon_imm = len(a.b)
+    a.d(0).d(len(lexicon)).pad()
     struct.pack_into('<I', a.b, profile_imm, rva + profile_offset)
 
     def join(label, char, before, hidden, original, resume):
@@ -88,9 +90,12 @@ def _payload_onetwo(rva, core, policy):
         a.raw(original).branch('e9', resume).pad()
     join('measure_join', 'fc', 'pointer', '10', '8b4d0c 0101', 285986)
     join('extract_join', 'f0', 'f8', '10', '8b4de4 0145f8', 286940)
+    a.label('lexicon')
+    a.b.extend(lexicon)
+    struct.pack_into('<I', a.b, lexicon_imm, rva + a.labels['lexicon'])
     return (a.finish(), a.labels)
 
-def _payload_other(rva, core, policy, p):
+def _payload_other(rva, core, policy, p, lexicon):
     """All addresses in p are RVAs; normalized C helpers keep the six-arg ABI."""
     a = X86(rva)
     old = p['family'] == 'old3'
@@ -162,7 +167,9 @@ def _payload_other(rva, core, policy, p):
     a.label('profile')
     profile_offset = len(a.b)
     a.d(p['pending']).d(rva + a.labels['measure_normalized']).d(rva + a.labels['no_start']).d(rva + a.labels['no_end'])
-    a.d(rva + a.labels['zero'] if old else p['vertical']).pad()
+    a.d(rva + a.labels['zero'] if old else p['vertical'])
+    lexicon_imm = len(a.b)
+    a.d(0).d(len(lexicon)).pad()
     import struct
     struct.pack_into('<I', a.b, profile_imm, rva + profile_offset)
 
@@ -187,10 +194,16 @@ def _payload_other(rva, core, policy, p):
         a.raw(stolen).branch('e9', site + len(bytes.fromhex(stolen))).pad()
     join('measure_join', True)
     join('extract_join', False)
+    a.label('lexicon')
+    a.b.extend(lexicon)
+    struct.pack_into('<I', a.b, lexicon_imm, rva + a.labels['lexicon'])
     return (a.finish(), a.labels)
 
-def build_payload(rva, profile, core, spacing):
+def build_payload(rva, profile, core, spacing, lexicon=None):
     """Return (PIC bytes, relative labels), without modifying an executable."""
+    if lexicon is None:
+        from native_lexicon import LEXICON
+        lexicon = LEXICON
     if profile['family'] == 'onetwo':
-        return _payload_onetwo(rva, core, spacing)
-    return _payload_other(rva, core, spacing, profile)
+        return _payload_onetwo(rva, core, spacing, lexicon)
+    return _payload_other(rva, core, spacing, profile, lexicon)

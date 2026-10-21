@@ -38,6 +38,7 @@ def synthetic_pe(profile):
         instruction = stolen if stolen is not None else b'\xe8' + struct.pack('<i', call_target - site - 5)
         offset = 0x200 + site - 0x1000
         data[offset:offset + len(instruction)] = instruction
+    data[0x200 + profile['ascii_measure_trim'] - 0x1000] = 0x48
     return bytes(data) + b'OWNED SYNTHETIC OVERLAY'
 
 
@@ -143,6 +144,14 @@ class NativeLayoutTests(unittest.TestCase):
                 self.assertEqual(new.OPTIONAL_HEADER.DllCharacteristics, old.OPTIONAL_HEADER.DllCharacteristics)
                 self.assertEqual(new.sections[-1].Name.rstrip(b'\0'), b'.nblay')
                 self.assertEqual(new.sections[-1].Characteristics, 0x60000020)
+                lexicon_rva = int(report['labels']['lexicon'], 16)
+                profile_rva = int(report['labels']['profile'], 16)
+                fields = struct.unpack('<7I', new.get_data(profile_rva, 28))
+                self.assertEqual(fields[5], lexicon_rva)
+                self.assertEqual(new.get_data(lexicon_rva, 4), b'NBLX')
+                self.assertEqual(fields[6], struct.unpack('<I', new.get_data(lexicon_rva + 28, 4))[0])
+                self.assertEqual(hashlib.sha256(new.get_data(lexicon_rva, fields[6])).hexdigest(),
+                                 report['lexicon']['sha256'])
                 self.assertEqual(result[0x205], 0x90)
                 self.assertEqual(result[len(original) - 23:len(original)], original[-23:])
                 self.assertEqual(new.get_data(0x4f000, 12), old.get_data(0x4f000, 12))
@@ -150,6 +159,10 @@ class NativeLayoutTests(unittest.TestCase):
                 for item in report['patches']:
                     offset = item['file_offset']; size = len(bytes.fromhex(item['after']))
                     allowed.update(range(offset, offset + size))
+                    if item.get('kind') == 'consistent-ascii-measurement':
+                        self.assertEqual(item['before'], '48')
+                        self.assertEqual(result[offset:offset + 1], b'\x90')
+                        continue
                     for load_base in (0x400000, 0x18000000, 0x28000000):
                         delta = struct.unpack_from('<i', result, offset + 1)[0]
                         self.assertEqual(load_base + int(item['rva'], 16) + 5 + delta,
@@ -168,6 +181,10 @@ class NativeLayoutTests(unittest.TestCase):
             layout._patch(original, bytes(baseline), 'synthetic', profile)
         baseline = bytearray(original); baseline[0x84 + 4] = 1
         with self.assertRaisesRegex(ValueError, 'changed PE structure'):
+            layout._patch(original, bytes(baseline), 'synthetic', profile)
+        baseline = bytearray(original)
+        baseline[0x200 + profile['ascii_measure_trim'] - 0x1000] = 0x90
+        with self.assertRaisesRegex(ValueError, 'ASCII measurement decrement'):
             layout._patch(original, bytes(baseline), 'synthetic', profile)
 
     def test_no_section_header_space_and_noncode_hook_are_rejected(self):

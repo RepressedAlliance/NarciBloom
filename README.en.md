@@ -4,6 +4,8 @@ Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology P
 
 **Current release: [v0.2.0-preview.5](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.5) · Developer preview.** Native Windows and SteamOS packages include the new Chinese short-tail and spacing adjustments. Full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
 
+Source preview.6 is preparing further fixes for closing-punctuation clusters, word boundaries and extraction/measurement consistency. The downloads below remain preview.5 and do not include those changes. See the [root-cause and validation notes](docs/LAYOUT.md).
+
 - Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
 - Persistent size settings and an optional existing local font family; no font installation or system-locale change.
 - Readable native dialogs and menus, with Chinese captions for common controls in supported Chinese installations; some fixed prompts remain in English.

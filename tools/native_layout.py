@@ -13,6 +13,7 @@ import pefile
 
 from native_layout_generated import SPACING, SPACING_SHA256, TAIL, TAIL_SHA256
 from native_layout_x86 import build_payload
+from native_lexicon import LEXICON_SHA256, WORD_COUNT, SOURCE as LEXICON_SOURCE
 
 
 _ORIGINALS = {
@@ -26,17 +27,20 @@ _FAMILIES = {
     'onetwo': dict(family='onetwo', extract=0x45d60, extract_calls=(0x48e99,),
         measure=0x45c20, measure_calls=(0x46664, 0x475cc),
         measure_join=0x45d1d, extract_join=0x460d6,
+        ascii_measure_trim=0x45d1c,
         measure_stolen='8b4d0c0101', extract_stolen='8b4de40145f8'),
     'sumire': dict(family='sumire', extract=0x42390, extract_calls=(0x44f5d,),
         pending=0x12cce4, measure=0x43fb0, measure_calls=(0x42f57, 0x466cc),
         no_start=0x43f00, no_end=0x43e50, vertical=0xc7e1c,
         measure_join=0x4409d, extract_join=0x426d7,
+        ascii_measure_trim=0x4409c,
         measure_stolen='8b4d140101', extract_stolen='8b4dec0145fc'),
     'old3': dict(family='old3', handler=0x1e930, handler_calls=(0x1203f, 0x1dfc4),
         pending=0x118130, snapshot=0x1ed57, snapshot_stolen='c644246400',
         post=0x1f42e, post_stolen='8a44246484c0', measure=0x1a2e0,
         measure_calls=(0x1a201, 0x1a704), no_start=0x1f680, no_end=0x1f700,
         measure_join=0x1a3f2, extract_join=0x1efa1,
+        ascii_measure_trim=0x1a3f1,
         measure_stolen='8b138b4c242c', extract_stolen='8b4c24388b742414'),
 }
 
@@ -123,6 +127,17 @@ def _patch(original, baseline, module, profile):
         records.append(dict(rva=hex(site), file_offset=offset, before=before.hex(),
                             after=after.hex(), target_rva=hex(target)))
 
+    # Native redraw/probe decrements only an uncached scale-4 ASCII width;
+    # extraction does not. Remove precisely that one-byte DEC, so all three
+    # paths use the same cached/GDI advance. Cached and CJK paths bypass it.
+    site = profile['ascii_measure_trim']
+    offset = image.get_offset_from_rva(site)
+    if source.get_data(site, 1) != b'\x48' or baseline[offset:offset + 1] != b'\x48':
+        raise ValueError('Unexpected or altered native ASCII measurement decrement')
+    result[offset] = 0x90
+    records.append(dict(rva=hex(site), file_offset=offset, before='48', after='90',
+                        kind='consistent-ascii-measurement'))
+
     result[header:header + 40] = struct.pack('<8sIIIIIIHHI', b'.nblay\0\0', len(payload),
         rva, raw_size, raw_offset, 0, 0, 0, 0, 0x60000020)
     struct.pack_into('<H', result, image.FILE_HEADER.get_field_absolute_offset('NumberOfSections'),
@@ -153,7 +168,11 @@ def _patch(original, baseline, module, profile):
         'section': dict(name='.nblay', rva=hex(rva), file_offset=raw_offset,
                         virtual_size=len(payload), raw_size=raw_size, permissions='RX'),
         'new_imports': False, 'new_relocations': False, 'pending_capacity': 1024,
-        'policy': 'horizontal leading ASCII space; half-width U+3000; bounded one-body closing tail',
+        'policy': 'horizontal spacing; generic fixed-point word DAG; closing clusters; bounded short-tail preference',
+        'lexicon': {'sha256': LEXICON_SHA256, 'words': WORD_COUNT,
+                    'upstream_commit': LEXICON_SOURCE['commit'], 'max_word_units': 8},
+        'max_plain_units': 512,
+        'fallback_ascii_metrics_match_extraction': True,
         'old3_justification_bypass': profile['family'] == 'old3',
     }
 
