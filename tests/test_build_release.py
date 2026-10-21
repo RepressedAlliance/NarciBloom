@@ -62,7 +62,7 @@ class ReleaseBundleTests(unittest.TestCase):
     def test_new_build_fonts_and_chinese_products_keep_material_separate(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for name in ('LICENSE', 'LICENSE-APACHE-2.0.txt', 'THIRD_PARTY.md', '.deps/majiro-py/LICENSE',
+            for name in ('LICENSE', 'LICENSE-APACHE-2.0.txt', 'LICENSE-jieba.txt', 'THIRD_PARTY.md', '.deps/majiro-py/LICENSE',
                          'docs/INSTALLATION.md', 'docs/TRANSLATION.md', 'docs/COMPATIBILITY.md'):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +90,9 @@ class ReleaseBundleTests(unittest.TestCase):
             self.assertEqual(len(products), 2)
             for product in products:
                 with zipfile.ZipFile(output / product['filename']) as archive:
+                    notices = [name for name in archive.namelist() if name.endswith('/licenses/jieba-dictionary-LICENSE.txt')]
+                    self.assertEqual(len(notices), 1)
+                    self.assertEqual(archive.read(notices[0]), b'synthetic notice')
                     inputs = [name for name in archive.namelist() if name.endswith(PREPARED_ARCHIVE_NAME)]
                     self.assertEqual(len(inputs), int('-Chinese.zip' in product['filename']))
                     if inputs:

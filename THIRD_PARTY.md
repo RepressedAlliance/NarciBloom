@@ -8,9 +8,12 @@
 | [evbunpack](https://github.com/mos9527/evbunpack) | `ee7b647acf2a46617b0c448dfa83d63132ea917b` | Apache-2.0 | 从用户本地的汉化程序中提取虚拟文件 |
 | [pefile](https://github.com/erocarrera/pefile) | `2024.8.26` | MIT | 识别 PE 文件位置 |
 | [aplib](https://github.com/snemes/aplib) | `0.6` | MIT | evbunpack 的解压依赖 |
+| [jieba 默认词频表](https://github.com/fxsjy/jieba/tree/67fa2e36e72f69d9134b8a1037b83fbb070b9775) | `67fa2e36e72f69d9134b8a1037b83fbb070b9775` | MIT，Copyright (c) 2013 Sun Junyi | 通用中文词边界的只读词频数据，不运行jieba或HMM |
 | PyInstaller | `6.22.3` | GPL-2.0-or-later，含原文 Bootloader Exception | 构建玩家可执行入口，发行包保留 COPYING |
 
 `tools/bootstrap.py` 将 majiro-py 的源码及原始 LICENSE 下载到被 Git 忽略的 `.deps/`。其余依赖由 `requirements.txt` 安装。发布安装包若包含这些依赖，应一并保留各自要求的许可与声明。
+
+`tools/native_lexicon.py` 从上述固定jieba默认词频表生成，仅保留可编码GBK的1～8字汉字词及其词频，包含单字；它不含游戏台词、汉化或玩家数据。原MIT声明保存在 [LICENSE-jieba.txt](LICENSE-jieba.txt)，玩家包同时复制到 `licenses/jieba-dictionary-LICENSE.txt`。生成器记录输入SHA-256、过滤方法和定点成本，使用公开通用词频作为软边界依据；不以少量剧情词定制，也不保证所有歧义词和专名切分正确。上游词表的MIT许可不等于已独立审核其全部历史语料来源。
 
 玩家包的 `licenses/` 同时保留 Python、Tcl/Tk、libffi、OpenSSL、zlib 与其他实际随包依赖的原始声明；版本以各平台的 `build-info.json`、`licenses/runtime-sources.json` 和原生运行库清单为准。Linux 构建使用兼容 SteamOS 的系统 X11、字体和 RAR 库，不另外复制整套系统库。运行库声明收集器记录实际来源及缺口，不将通用许可证文本当作对应源码或其他义务已经满足的证明。
 
