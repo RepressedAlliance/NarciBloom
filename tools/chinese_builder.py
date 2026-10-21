@@ -8,6 +8,7 @@ from patch_narcissu_font import archive, entries
 from translation_adapter import extract_virtual_files, restore_virtual_pe
 from translation_package import PreparedTranslation
 import pefile
+from native_layout import patch_chinese_native_layout
 
 
 @dataclass(frozen=True)
@@ -338,7 +339,9 @@ def _build_chinese_sources(game, virtual, executable, stock_files, font_family):
             raise ValueError('required Chinese translation DLL is missing')
         payload[name] = _caption_assignment(payload[name], digest, rva, expected)
         hooks.append({'dll': name, 'rva': rva, 'change': 'preserve original window and child-control captions'})
+    restored_engine = executable
     executable, dialogs = native_dialogs(executable, chinese=True)
+    executable, layout = patch_chinese_native_layout(restored_engine, baseline=executable)
     report = dict(report, source='PC Chinese v1.1 virtual files', ui_translation_tables=table_reports,
-                  caption_hooks=hooks, **dialogs, payload_files=sorted(payload))
+                  caption_hooks=hooks, native_layout=layout, **dialogs, payload_files=sorted(payload))
     return ChineseBuild(payload, executable, report)

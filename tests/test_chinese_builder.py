@@ -171,7 +171,8 @@ class ChineseBuilderTests(unittest.TestCase):
         stock = {'config.mjo': original, 'console.mjo': original, 'load_sysdata.mjo': original}
         with patch.object(chinese, 'extract_virtual_files', return_value=virtual) as extraction, \
              patch.object(chinese, 'restore_virtual_pe', return_value=b'PE') as restoration, \
-             patch.object(chinese, 'native_dialogs', return_value=(b'PE', {})), \
+             patch.object(chinese, 'native_dialogs', return_value=(b'UI PE', {})), \
+             patch.object(chinese, 'patch_chinese_native_layout', return_value=(b'layout PE', {'native': True})) as layout, \
              patch.object(chinese, '_caption_assignment', return_value=b'patched dll'), \
              patch.object(chinese, 'build_overrides', side_effect=lambda *args: (dict(overrides), {}, {}, {})):
             result = chinese.build_chinese_payload('narci_iris', b'packed', stock)
@@ -181,7 +182,10 @@ class ChineseBuilderTests(unittest.TestCase):
         extraction.assert_called_once_with(b'packed')
         restoration.assert_called_once_with(b'packed')
         self.assertIsInstance(result, chinese.ChineseBuild)
-        self.assertEqual(result.executable, b'PE')
+        self.assertEqual(result.executable, b'layout PE')
+        self.assertEqual(result.report['native_layout'], {'native': True})
+        self.assertEqual(layout.call_count, 2)
+        layout.assert_called_with(b'PE', baseline=b'UI PE')
         self.assertEqual(result.payload['update.arc'], virtual['update.arc'])
         self.assertEqual(result.payload['Narcissu_cn.dll'], b'patched dll')
         generated = entries(result.payload['update12.arc'])
@@ -213,6 +217,7 @@ class ChineseBuilderTests(unittest.TestCase):
         with patch.object(chinese, 'extract_virtual_files', return_value=virtual), \
              patch.object(chinese, 'restore_virtual_pe', return_value=b'PE'), \
              patch.object(chinese, 'native_dialogs', return_value=(b'PE', {})), \
+             patch.object(chinese, 'patch_chinese_native_layout', return_value=(b'PE', {})), \
              patch.object(chinese, '_caption_assignment', return_value=b'patched dll'), \
              patch.object(chinese, 'build_overrides', return_value=(overrides, report, {}, {})):
             result = chinese.build_chinese_payload('narci_iris', b'packed', stock)

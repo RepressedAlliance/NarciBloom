@@ -54,6 +54,18 @@ Windows 和 SteamOS 使用各自的原生入口。SteamOS 安装器在桌面模�
 
 `layout_candidate.py` 按有效 console 边界插入等待，保留原打字事件；新增等待不创建原生存档点，并暂时保护设置／历史记录入口。插入页内保存会回到前一个原生停顿点，不能精确恢复该页。当前为预览实现，实机场景和合成长段结果见兼容性记录，不构成全篇与所有演出的保证。
 
+## 中文显示层
+
+`native_layout.patch_chinese_native_layout(original_restored, baseline=localized_engine)` 仅识别五个固定PC v1.1恢复引擎；日英路径不调用它。原始引擎用于身份检查，已本地化的同结构PE用于追加自有RX代码段和已核实的相对调用／跳转。保留导入、重定位、入口及原取行调用次数；三个布局分别适配，不将1＋2的栈协议套到其他篇章。
+
+自有C源码为 `native_layout_tail.c` 与 `native_layout_spacing.c`，`native_layout_generated.py` 保存无CRT／外部符号／数据重定位的32位代码及源指纹，`native_layout_x86.py` 生成位置无关的调用桥。安装器只需要原有Python依赖，不调用编译器。维护者可用Zig 0.16.0在不读取游戏的情况下核对生成物：
+
+```sh
+python tools/regenerate_native_layout.py --compiler /path/to/zig --build-dir work/native-layout-build --check
+```
+
+修改C源码时先审阅，再用同命令的 `--write` 重新生成，并运行相关检查。源指纹归一化CRLF/LF。缓冲区以原生1024字节数据容量为界，不借用尾部占用标志；退回的后缀保持原始字节，遇未知控制和不能证明安全的状态保留原断法。不要以普通汉字禁首表、译表批量替换或缓存中的硬换行替代这条显示路径。实际游戏检查和剩余范围见兼容性说明。
+
 ## 高级：仅生成原版覆盖资源
 
 维护者可直接使用 `build_font_settings.py`。此入口读取指定副本并生成 `work/staged/<模块>/update12.arc` 与构建报告，不执行安装器版本识别或恢复事务，也不改源游戏。它不能替代完整的中文构建和原生窗口修正。
