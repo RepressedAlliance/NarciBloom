@@ -18,6 +18,8 @@ import subprocess
 import sys
 import sysconfig
 
+from runtime_license_reviews import RUNTIME_LICENSE_REVIEWS
+
 LINUX_LIBRARY_EXCEPTIONS = ("libtcl*.so*", "libtk*.so*", "libffi.so*", "libcrypto.so*", "libssl.so*")
 COMMON_ROOTS = (Path("/usr/share/licenses/common"), Path("/usr/share/common-licenses"))
 SHARE_ROOT = Path("/usr/share")
@@ -280,6 +282,28 @@ def _copy_notice(source, destination, relative):
     return {"file": relative.as_posix(), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+def _runtime_license_review(manager, details, files, primary_notices):
+    """Select an exact prior scope review; unknown inputs still need review."""
+    actual_notices = sorted((item["path"], item["sha256"]) for item in primary_notices)
+    actual_files = sorted(PurePosixPath(relative).name for relative in files)
+    for review in RUNTIME_LICENSE_REVIEWS:
+        if (manager != review["package_manager"] or details["name"] != review["package"]
+                or any(details[key] != review[key] for key in
+                       ("version", "source_package", "source_version"))
+                or actual_files != sorted(review["shipped_basenames"])
+                or actual_notices != sorted((item["path"], item["sha256"])
+                                            for item in review["primary_notices"])):
+            continue
+        return {"package": details["name"], "version": details["version"],
+                "source_package": details["source_package"], "source_version": details["source_version"],
+                "files": sorted(files), "runtime_license": review["runtime_license"],
+                "primary_notices": [dict(item) for item in review["primary_notices"]],
+                "primary_sources": list(review["primary_sources"]),
+                "excluded_scopes": [dict(item) for item in review["excluded_scopes"]],
+                "reason": review["reason"]}
+    return None
+
+
 def collect_native_notices(frozen_dir, notices_dir, *, provider_notices=None):
     """Copy installed Linux package copyright/notices and return a JSON report.
 
@@ -303,7 +327,8 @@ def collect_native_notices(frozen_dir, notices_dir, *, provider_notices=None):
     origins = _analysis_origins(internal)
     report = {"schema": 1, "package_manager": database.manager if database else None,
               "files": [], "packages": [], "unresolved_files": [], "missing_notices": [],
-              "source_review_required": [], "separately_supplied": [], "compliance_status": "not_assessed",
+              "source_review_required": [], "reviewed_runtime_licenses": [],
+              "separately_supplied": [], "compliance_status": "not_assessed",
               "limitations": [
                   "Collecting license texts does not establish complete distribution compliance.",
                   "Corresponding source, source offers, and LGPL relinking obligations are not supplied or verified.",
@@ -350,11 +375,13 @@ def collect_native_notices(frozen_dir, notices_dir, *, provider_notices=None):
         if not declared:
             declared = " ; ".join(sorted(set(re.findall(r"^License:[ \t]*(.+)$", texts, re.M))))
             details["declared_licenses"] = declared
-        copied = []
+        copied, primary_notices = [], []
         label = re.sub(r"[^A-Za-z0-9._+-]", "_", package)
         for source in sources:
             relative = Path("native/packages") / label / source.relative_to(SHARE_ROOT)
             copied.append(_copy_notice(source, destination, relative))
+            primary_notices.append({"path": source.relative_to(SHARE_ROOT).as_posix(),
+                                    "sha256": copied[-1]["sha256"]})
         common_sources, missing_common = _common_references(texts, declared)
         for source in sorted(set(common_sources)):
             root = next(root for root in COMMON_ROOTS if source.is_relative_to(root))
@@ -376,7 +403,10 @@ def collect_native_notices(frozen_dir, notices_dir, *, provider_notices=None):
             markers.append("LGPL (license text)")
         if "gnu general public license" in texts.casefold() and not markers:
             markers.append("GPL (license text)")
-        if markers:
+        reviewed = _runtime_license_review(database.manager, details, files, primary_notices)
+        if markers and reviewed is not None and not missing_common:
+            report["reviewed_runtime_licenses"].append(reviewed)
+        elif markers:
             report["source_review_required"].append({"package": package, "markers": markers,
                 "reason": "Review the specific shipped library, license alternatives/exceptions, corresponding source and relinking terms; not satisfied by these copied notices."})
         details.update({"files": files, "notices": copied, "missing_shared_licenses": missing_common})

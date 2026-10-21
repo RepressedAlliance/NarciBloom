@@ -1,5 +1,6 @@
 """Synthetic package ownership/notices for native runtime collection."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -193,6 +194,112 @@ class RuntimeNoticeTests(unittest.TestCase):
         self.assertFalse(report["notice_collection_complete"])
         self.assertEqual(len(report["unresolved_files"]), 4)
         self.assertEqual(report["separately_supplied"], [])
+
+    def reviewed_runtime_fixture(self, index):
+        # Synthetic notices exercise the selector without downloading or
+        # duplicating complete distro copyright files in the source tree.
+        review = copy.deepcopy(runtime.RUNTIME_LICENSE_REVIEWS[index])
+        name, package = review["shipped_basenames"][0], review["package"]
+        self.add_library(name, package, declared="")
+        if index == 0:
+            notice = (b"License: MIT\nSynthetic runtime permission.\n\n"
+                      b"Documentation/doc/*: GPL.\nSee /usr/share/common-licenses/GPL\n")
+            put(self.ubuntu_common, "GPL", b"Synthetic complete GPL notice")
+        else:
+            notice = (b"Files: *\nLicense: Apache-2.0\n\n"
+                      b"Files: external/perl/Text-Template-1.56/*\nLicense: Artistic or GPL-1+\n"
+                      b"See /usr/share/common-licenses/GPL-1\n")
+            put(self.ubuntu_common, "GPL-1", b"Synthetic complete GPL-1 notice")
+        path = put(self.share, review["primary_notices"][0]["path"], notice)
+        review["primary_notices"][0]["sha256"] = hashlib.sha256(notice).hexdigest()
+        self.metadata[package].update(version=review["version"], source_package=review["source_package"],
+                                      source_version=review["source_version"], package_files=[str(path)])
+        return review, notice
+
+    def test_exact_reviewed_runtime_scope_retains_full_notices_and_unassessed_status(self):
+        self.database.manager = "dpkg"
+        fixtures = [self.reviewed_runtime_fixture(index) for index in (0, 1)]
+        with patch.object(runtime, "RUNTIME_LICENSE_REVIEWS", tuple(item[0] for item in fixtures)):
+            report = self.collect()
+        self.assertEqual(report["source_review_required"], [])
+        self.assertEqual(report["missing_notices"], [])
+        self.assertEqual(report["unresolved_files"], [])
+        self.assertEqual(report["compliance_status"], "not_assessed")
+        self.assertEqual({item["runtime_license"] for item in report["reviewed_runtime_licenses"]},
+                         {"MIT", "Apache-2.0"})
+        self.assertEqual(len(report["reviewed_runtime_licenses"]), 2)
+        for review, notice in fixtures:
+            selected = next(item for item in report["reviewed_runtime_licenses"] if item["package"] == review["package"])
+            self.assertEqual(selected["primary_notices"], list(review["primary_notices"]))
+            self.assertEqual(selected["primary_sources"], list(review["primary_sources"]))
+            self.assertTrue(selected["excluded_scopes"])
+            package = next(item for item in report["packages"] if item["name"] == review["package"])
+            original = next(item for item in package["notices"] if item["file"].endswith("/copyright"))
+            self.assertEqual((self.destination / original["file"]).read_bytes(), notice)
+            self.assertTrue(any(item["file"].startswith("native/common/GPL") for item in package["notices"]))
+
+    def test_review_cannot_cover_changed_identity_hash_or_shipped_basenames(self):
+        self.database.manager = "dpkg"
+        review, _notice = self.reviewed_runtime_fixture(1)
+        package = review["package"]
+        baseline = copy.deepcopy(self.metadata[package])
+        for field in ("version", "source_package", "source_version", "package_name",
+                      "notice_sha256", "notice_path", "package_manager", "basename"):
+            with self.subTest(field=field):
+                self.metadata[package] = copy.deepcopy(baseline)
+                self.database.manager = "dpkg"
+                changed_review = copy.deepcopy(review)
+                if field == "notice_sha256":
+                    changed_review["primary_notices"][0]["sha256"] = "0" * 64
+                elif field == "package_manager":
+                    self.database.manager = "pacman"
+                elif field == "basename":
+                    changed_review["shipped_basenames"] = ("libssl.so.3",)
+                elif field == "notice_path":
+                    changed_review["primary_notices"][0]["path"] = "doc/another/copyright"
+                elif field == "package_name":
+                    self.metadata[package]["name"] += "-changed"
+                else:
+                    self.metadata[package][field] += "-changed"
+                with patch.object(runtime, "RUNTIME_LICENSE_REVIEWS", (changed_review,)):
+                    report = self.collect()
+                self.assertEqual(report["reviewed_runtime_licenses"], [])
+                self.assertEqual(report["source_review_required"][0]["package"], package)
+
+    def test_changed_installed_notice_bytes_require_new_scope_review(self):
+        self.database.manager = "dpkg"
+        review, notice = self.reviewed_runtime_fixture(1)
+        path = self.share / review["primary_notices"][0]["path"]
+        path.write_bytes(notice + b"\nChanged installed package notice.\n")
+        with patch.object(runtime, "RUNTIME_LICENSE_REVIEWS", (review,)):
+            report = self.collect()
+        self.assertEqual(report["reviewed_runtime_licenses"], [])
+        self.assertEqual(report["source_review_required"][0]["package"], review["package"])
+
+    def test_additional_library_from_reviewed_package_still_needs_review(self):
+        self.database.manager = "dpkg"
+        review, _notice = self.reviewed_runtime_fixture(1)
+        package = review["package"]
+        source = put(self.root, "system/usr/lib/libssl.so.3", b"\x7fELFadditional-runtime")
+        put(self.internal, "libssl.so.3", source.read_bytes())
+        self.origins.append(("libssl.so.3", str(source), "BINARY"))
+        self.owners[str(source)] = package
+        with patch.object(runtime, "RUNTIME_LICENSE_REVIEWS", (review,)):
+            report = self.collect()
+        self.assertEqual(report["reviewed_runtime_licenses"], [])
+        self.assertEqual(report["source_review_required"][0]["package"], package)
+
+    def test_review_does_not_remove_unknown_gnu_library_gate_or_missing_shared_notice(self):
+        self.database.manager = "dpkg"
+        review, _notice = self.reviewed_runtime_fixture(0)
+        self.add_library("libunknown.so.1", "unknown-runtime", declared="LGPL-2.1+",
+                         notice=b"License: LGPL-2.1+\nSynthetic unknown runtime\n")
+        with patch.object(runtime, "RUNTIME_LICENSE_REVIEWS", (review,)):
+            report = self.collect()
+        self.assertEqual(len(report["reviewed_runtime_licenses"]), 1)
+        self.assertEqual(report["source_review_required"][0]["package"], "unknown-runtime")
+        self.assertEqual(report["missing_notices"][0]["package"], "unknown-runtime")
+        self.assertFalse(report["notice_collection_complete"])
 
 
 class PackageDatabaseTests(unittest.TestCase):
