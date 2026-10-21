@@ -22,7 +22,11 @@ _ORIGINAL = {
 
 # Basic closing/opening punctuation only. Native preservation of ellipsis/dash
 # pairs and arbitrary-length punctuation clusters has not been established.
-NO_START = '、。，．？！：；）〕］｝〉》」』】〗”’'
+_PREVIEW4_NO_START = '、。，．？！：；）〕］｝〉》」』】〗”’'
+# A trailing fullwidth wave is part of the preceding spoken syllable. Leaving
+# it eligible at line start permits a short tail such as ～」. Let the native
+# TYPE0 pullback carry the preceding character with it, using actual widths.
+NO_START = _PREVIEW4_NO_START + '～'
 NO_END = '（〔［｛〈《「『【〖“‘'
 _CHINESE = {
     # Older supported engines use byte strstr instead of MBCS-aware search.
@@ -32,12 +36,14 @@ _CHINESE = {
     'GYOUTOUKINSOKU': b'\xff'.join(c.encode('gbk') for c in NO_START),
     'GYOUMATUKINSOKU': b'\xff'.join(c.encode('gbk') for c in NO_END),
 }
+_PREVIEW4 = dict(_CHINESE, GYOUTOUKINSOKU=b'\xff'.join(
+    c.encode('gbk') for c in _PREVIEW4_NO_START))
 
 
 def chinese_kinsoku_env(blob: bytes) -> tuple[bytes, dict]:
     """Return a Chinese-only environment edit and metadata; never write files.
 
-    Accept the exact reviewed original tables or our already-patched pair.
+    Accept the exact original, preview.4, or current already-patched pair.
     Reject unknown, mixed, missing or duplicate settings. Preserve every byte
     outside the two values, including comments, key spacing and line endings.
     The caller must select this helper only for the supported Chinese loader;
@@ -53,7 +59,7 @@ def chinese_kinsoku_env(blob: bytes) -> tuple[bytes, dict]:
     if matches['KINSOKU_TYPE'].group(1) != b'0':
         raise ValueError('only the reviewed native KINSOKU_TYPE 0 is supported')
     previous = {key: matches[key].group(1) for key in _ORIGINAL}
-    if previous != _ORIGINAL and previous != _CHINESE:
+    if previous not in (_ORIGINAL, _PREVIEW4, _CHINESE):
         raise ValueError('unrecognized native kinsoku tables; custom values were not changed')
     result = blob
     changed = []

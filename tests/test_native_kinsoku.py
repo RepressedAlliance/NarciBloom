@@ -53,7 +53,7 @@ class NativeKinsokuTests(unittest.TestCase):
             self.assertTrue(native_member(adapted['GYOUMATUKINSOKU'], opening.encode('gbk')))
             self.assertFalse(native_member(adapted['GYOUTOUKINSOKU'], opening.encode('gbk')))
             self.assertTrue(native_member(adapted['GYOUTOUKINSOKU'], closing.encode('gbk')))
-        for character in '。』」？！、，':
+        for character in '。』」？！、，～':
             with self.subTest(character=character):
                 self.assertFalse(native_member(original['GYOUTOUKINSOKU'], character.encode('gbk')))
                 self.assertTrue(native_member(adapted['GYOUTOUKINSOKU'], character.encode('gbk')))
@@ -89,7 +89,7 @@ class NativeKinsokuTests(unittest.TestCase):
 
     def test_all_valid_gbk_cells_match_only_expected_punctuation_in_both_engines(self):
         adapted = values(chinese_kinsoku_env(environment())[0])
-        expected = {'GYOUTOUKINSOKU': set('、。，．？！：；）〕］｝〉》」』】〗”’'),
+        expected = {'GYOUTOUKINSOKU': set('、。，．？！：；）〕］｝〉》」』】〗”’～'),
                     'GYOUMATUKINSOKU': set('（〔［｛〈《「『【〖“‘')}
         tested = 0
         for first in range(256):
@@ -110,6 +110,28 @@ class NativeKinsokuTests(unittest.TestCase):
                     self.assertEqual(cell in table, wanted, (key, cell.hex(), 'strstr'))
                     self.assertEqual(native_member(table, cell), wanted, (key, cell.hex(), 'mbcs'))
         self.assertEqual(tested, 21919)
+
+    def test_preview4_wave_tail_upgrade_preserves_other_rules(self):
+        current = chinese_kinsoku_env(environment())[0]
+        tables = values(current)
+        # The exact previous release is recognized, while custom tables still
+        # fail. Reproduce only its old start table; do not import private data.
+        old_start = b'\xff'.join(c.encode('gbk') for c in '、。，．？！：；）〕］｝〉》」』】〗”’')
+        previous = current.replace(tables['GYOUTOUKINSOKU'], old_start, 1)
+        upgraded, report = chinese_kinsoku_env(previous)
+        self.assertEqual(upgraded, current)
+        self.assertEqual(report['changed_line_one_based'], [4])
+        new_start = values(upgraded)['GYOUTOUKINSOKU']
+        # At the reported native boundary (last character + pending ～」),
+        # ～ must trigger the existing TYPE0 pullback instead of starting a row.
+        for pending in ('～」', '～』', '～。'):
+            cell = pending[0].encode('gbk')
+            self.assertNotIn(cell, old_start)
+            self.assertIn(cell, new_start)
+            self.assertTrue(native_member(new_start, cell))
+        for ordinary in ('呜', '字', 'A', '~', ' '):
+            self.assertFalse(native_member(new_start, ordinary.encode('gbk')))
+        self.assertEqual(values(previous)['GYOUMATUKINSOKU'], tables['GYOUMATUKINSOKU'])
 
     def test_unknown_mode_tables_mixed_pair_and_duplicate_keys_are_rejected(self):
         original = environment()
