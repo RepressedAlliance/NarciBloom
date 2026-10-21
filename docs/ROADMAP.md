@@ -21,15 +21,15 @@
 - [x] 发布 Windows／SteamOS 原生四包及校验清单，记录干净安装与卸载的实际范围。
 - [x] preview.3 修复已复现的自动分页提前结束、自然尾页读档空白、历史返回卡住及旧日文存读档界面乱码。
 
-当前已发布版本：[v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4)。源码与安装检查、实际场景和未验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。这些完成项不表示全篇或全部平台组合已验收。
+当前已发布版本：[v0.2.0-preview.5](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.5)。源码与安装检查、实际场景和未验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。这些完成项不表示全篇或全部平台组合已验收。
 
-## preview.5：源码完成，准备发布（2026-10-22）
+## 已完成：preview.5 发布（2026-10-22）
 
 - [x] 五个受支持中文引擎的局部短尾调整、行首半角空格与全角空白显示规则；原译文不改，不实现中文分词或英文整词保护。
 - [x] 全角波浪号加入GBK行首禁则。
 - [x] 核心源码CI通过，185项检查中181项通过、4项平台跳过；新增6项原生检查，三个ABI族实际32位调用检查及十五组输入构建通过。
 - [x] SteamOS中文1＋2最终候选44档短尾对照、历史打开／返回及单字回答有限抽样。
-- [ ] 发布preview.5玩家包并完成正式Deck更新；当前尚未执行。
+- [x] 发布preview.5 Windows／SteamOS四包与校验清单；正式Deck更新完成文件级核验，保留个人存档及原备份。
 - [ ] 补充其余中文引擎的实际场景与其他字号抽样；共享实现不等于五部实机通过。
 
 ## 后续验证与稳定版

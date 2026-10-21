@@ -2,7 +2,7 @@
 
 NarciBloom 为 Steam《Narcissu 10th Anniversary Anthology Project》（应用 ID `426690`）提供可调字号。当前安装包属于开发预览：自动识别、安装与恢复检查不等于逐章游玩验证，具体范围见[兼容性说明](COMPATIBILITY.md)。免费版《Narcissu 1st & 2nd》是另一款游戏，不适用本安装器。
 
-源码版本0.2.0-preview.5正在准备发布，尚未更新正式Deck安装。当前已发布版本为 [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4)，提供 Windows／SteamOS 各一份 Fonts 和 Chinese ZIP；[首页下载表](../README.md#两种安装包)可直接选择。Windows 入口为 `NarciBloom.exe`／`NarciBloomChinese.exe`，SteamOS 入口为 `NarciBloom`／`NarciBloomChinese`。
+当前已发布版本为 [v0.2.0-preview.5](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.5)，提供 Windows／SteamOS 各一份 Fonts 和 Chinese ZIP；[首页下载表](../README.md#两种安装包)可直接选择。Windows 入口为 `NarciBloom.exe`／`NarciBloomChinese.exe`，SteamOS 入口为 `NarciBloom`／`NarciBloomChinese`。
 
 ## 选择安装包
 

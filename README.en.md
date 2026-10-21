@@ -2,7 +2,7 @@
 
 Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology Project**, with Steam Deck as the first target.
 
-**Source version: 0.2.0-preview.5 · Preparing for release.** Published downloads below remain [v0.2.0-preview.4](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.4); preview.5 has not been released or applied to the formal Deck installation. Full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
+**Current release: [v0.2.0-preview.5](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.5) · Developer preview.** Native Windows and SteamOS packages include the new Chinese short-tail and spacing adjustments. Full-story playthroughs remain unverified. See the [compatibility notes](docs/COMPATIBILITY.md) for the exact scope.
 
 - Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
 - Persistent size settings and an optional existing local font family; no font installation or system-locale change.
@@ -15,8 +15,8 @@ Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology P
 
 | Package | Purpose | Windows | SteamOS / Steam Deck |
 |---|---|---|---|
-| **Fonts** | Keep recognized Japanese, English or supported Chinese story text. No translation included or required. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-Windows-x64-Fonts.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-SteamOS-Linux-x64-Fonts.zip) |
-| **Chinese** | Includes prepared PC v1.1 translation inputs and credits; font changes are generated locally with the same core. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-Windows-x64-Chinese.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/NarciBloom-0.2.0-preview.4-SteamOS-Linux-x64-Chinese.zip) |
+| **Fonts** | Keep recognized Japanese, English or supported Chinese story text. No translation included or required. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.5/NarciBloom-0.2.0-preview.5-Windows-x64-Fonts.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.5/NarciBloom-0.2.0-preview.5-SteamOS-Linux-x64-Fonts.zip) |
+| **Chinese** | Includes prepared PC v1.1 translation inputs and credits; font changes are generated locally with the same core. | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.5/NarciBloom-0.2.0-preview.5-Windows-x64-Chinese.zip) | [Download ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.5/NarciBloom-0.2.0-preview.5-SteamOS-Linux-x64-Chinese.zip) |
 
 Only the recorded Steam anthology versions and PC v1.1 Chinese translation are recognized. Other editions, translation builds and the separate free *Narcissu 1st & 2nd* release are outside this scope. The installer lists stories actually installed on your machine; it does not download the game or DLC.
 
@@ -28,7 +28,7 @@ Close the game, extract the complete package, then open its native launcher: `Na
 
 Check the anthology's game root folder, select the supported stories you own, and choose **Install / Update**. The Chinese launcher detects its accompanying prepared ZIP; the recognized original RAR is also accepted. **Uninstall & Restore** uses the originals retained in the game's `.narcibloom` folder; keep that folder. Later changes by Steam or another mod are reported as conflicts instead of silently overwritten. Personal saves are protected. See the [installation and recovery guide](docs/INSTALLATION.md).
 
-Existing preview installations can use the new installer to update. Keep the `.narcibloom` record and backups; do not overwrite the translation manually. Release checksums are in [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.4/SHA256SUMS.txt).
+Existing preview installations can use the new installer to update. Keep the `.narcibloom` record and backups; do not overwrite the translation manually. Release checksums are in [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.5/SHA256SUMS.txt).
 
 In 1+2, open the pause menu → Options → Font / Size. The other stories add size buttons to their existing settings page. Image-based labels do not scale with story text.
 

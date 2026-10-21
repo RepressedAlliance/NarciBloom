@@ -1,6 +1,6 @@
 # 输入版本记录
 
-更新于 2026-10-22，适用于准备发布的 preview.5。安装器按 [source-profiles.json](source-profiles.json) 的十组日文／英文 EXE 与关键资源指纹，以及 [translation-source.json](translation-source.json) 的 PC v1.1 原包／透明材料标识识别输入。下面是便于阅读的版本说明；高级覆盖资源构建器不执行完整的安装器版本识别，不能仅凭 EXE 相同就认定全部资源一致。指纹匹配不代表来源身份、安全或权利认证。
+更新于 2026-10-22，适用于已发布的 preview.5。安装器按 [source-profiles.json](source-profiles.json) 的十组日文／英文 EXE 与关键资源指纹，以及 [translation-source.json](translation-source.json) 的 PC v1.1 原包／透明材料标识识别输入。下面是便于阅读的版本说明；高级覆盖资源构建器不执行完整的安装器版本识别，不能仅凭 EXE 相同就认定全部资源一致。指纹匹配不代表来源身份、安全或权利认证。
 
 ## Steam 日文输入
 
