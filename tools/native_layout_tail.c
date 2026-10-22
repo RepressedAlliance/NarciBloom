@@ -1,11 +1,11 @@
 /* Bounded CN display line selection. Words come from the generic frequency
-   lexicon in the same RX section, never a list of game sentences. The native
+   lexicon and character-position model in the same RX section, never a list of game sentences. The native
    extractor is called once; only its byte boundary may retreat. */
 typedef unsigned int u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
 typedef struct {
-    u32 pending, measure, no_start, no_end, vertical, lexicon, lexicon_bytes;
+    u32 pending, measure, no_start, no_end, vertical, lexicon, lexicon_bytes, model, model_bytes;
 } NBProfile;
 #define INLINE __attribute__((always_inline)) static inline
 #define NONE 0xffffffffu
@@ -66,6 +66,57 @@ INLINE u32 cost(const u8 *l,const u8 *word,u32 bytes) {
     }
     return NONE;
 }
+INLINE int valid_model(const u8 *m,u32 size) {
+    const u32 *h=(const u32*)m;
+    return size==191592 && h[0]==0x4d48424e && h[1]==1 && h[2]==23940
+        && h[3]==4 && h[4]==8 && h[5]==2129 && h[6]==size && h[7]==256;
+}
+INLINE u32 model_word(const u8 *m,const u8 *text,const u16 *ends,u32 first,u32 count) {
+    const u16 *values=(const u16*)(m+32);
+    u32 j,c,index,state,previous=0,result=values[count==1?3:0],v;
+    if(result==65535)return NONE;
+    for(j=0;j<count;++j){
+        if(ends[first+j+1]-ends[first+j]!=2)return NONE;
+        c=code(text+ends[first+j]);
+        index=((c>>8)-0x81)*190+(c&255)-0x40-((c&255)>0x7f);
+        if(index>=23940)return NONE;
+        state=count==1?3:(!j?0:(j+1==count?2:1));
+        v=values[20+index*4+state];if(v==65535)return NONE;result+=v;
+        if(j){v=values[4+previous*4+state];if(v==65535)return NONE;result+=v;}
+        previous=state;
+    }
+    return result;
+}
+/* Only dictionary-selected singleton runs are reconsidered. Reset-start word
+   costs make every selected suffix independent of text already displayed.
+   A rare constituent is required: generic common function words are not glued
+   together merely because a character-position model prefers that path. */
+INLINE void refine_words(const u8 *model,const u8 *lex,const u8 *text,
+                         const u16 *ends,u8 *route,u32 n,u32 *scores) {
+    u32 first=0,end,i,j,k,v,best,bestlen,score,rare;
+    while(first<n){
+        k=route[first]&0x7f;
+        if(k!=1||!body(code(text+ends[first]))){first+=k;continue;}
+        end=first+1;
+        while(end<n&&(route[end]&0x80)&&(route[end]&0x7f)==1&&body(code(text+ends[end])))++end;
+        scores[end%9]=0;
+        for(i=end;i>first;){
+            --i;v=model_word(model,text,ends,i,1);
+            best=(v==NONE?65535:v)+scores[(i+1)%9];bestlen=1;rare=0;
+            for(j=1;j<=8&&i+j<=end;++j){
+                v=cost(lex,text+ends[i+j-1],ends[i+j]-ends[i+j-1]);
+                if(v==NONE||v>=2129)rare=1;
+                if(j==1||!rare)continue;
+                v=model_word(model,text,ends,i,j);if(v==NONE)continue;
+                score=v+scores[(i+j)%9];
+                if(score<best||(score==best&&j>bestlen)){best=score;bestlen=j;}
+            }
+            scores[i%9]=best;route[i]=(u8)bestlen;
+        }
+        for(i=first;i<end;){k=route[i];route[i]|=0x80;i+=k;}
+        first=end;
+    }
+}
 INLINE u32 span_width(u32 fn,void *rect,u8 *text,u32 begin,u32 end) {
     u8 saved=text[end];u32 w;text[end]=0;
     w=(u32)width(fn,rect,text+begin);text[end]=saved;
@@ -124,6 +175,8 @@ u32 nb_adjust(u32 base,const NBProfile *p,void *rectangle,u8 *out,
         scores[i%9]=best;route[i]=(u8)bestlen;
     }
     for(i=0;i<n;){k=route[i];route[i]|=0x80;i+=k;}
+    if(valid_model((const u8*)(base+p->model),p->model_bytes))
+        refine_words((const u8*)(base+p->model),lex,text,ends,route,n,scores);
     for(i=cut;i<n;++i){c=code(text+ends[i]);if(body(c))++suffix_bodies;
         else if(!close_cell(c))suffix_plain=0;}
     after_width=span_width(base+p->measure,rectangle,text,a,original_length);

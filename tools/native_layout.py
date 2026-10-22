@@ -14,6 +14,7 @@ import pefile
 from native_layout_generated import SPACING, SPACING_SHA256, TAIL, TAIL_SHA256
 from native_layout_x86 import build_payload
 from native_lexicon import LEXICON_SHA256, WORD_COUNT, SOURCE as LEXICON_SOURCE
+from native_oov import MODEL_SHA256, HEADER as MODEL_HEADER
 
 
 _ORIGINALS = {
@@ -168,9 +169,11 @@ def _patch(original, baseline, module, profile):
         'section': dict(name='.nblay', rva=hex(rva), file_offset=raw_offset,
                         virtual_size=len(payload), raw_size=raw_size, permissions='RX'),
         'new_imports': False, 'new_relocations': False, 'pending_capacity': 1024,
-        'policy': 'horizontal spacing; generic fixed-point word DAG; closing clusters; bounded short-tail preference',
+        'policy': 'horizontal spacing; suffix-stable dictionary and OOV word lattices; closing clusters; bounded short-tail preference',
         'lexicon': {'sha256': LEXICON_SHA256, 'words': WORD_COUNT,
                     'upstream_commit': LEXICON_SOURCE['commit'], 'max_word_units': 8},
+        'oov_model': {'sha256': MODEL_SHA256, **MODEL_HEADER,
+                      'policy': 'reset-start word costs; dictionary singleton runs; rare-character gate'},
         'max_plain_units': 512,
         'fallback_ascii_metrics_match_extraction': True,
         'old3_justification_bypass': profile['family'] == 'old3',

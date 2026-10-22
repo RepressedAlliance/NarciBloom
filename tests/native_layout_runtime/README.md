@@ -12,9 +12,9 @@ does not delete or overwrite previous evidence, download dependencies or change
 system settings. Other hosts are explicitly unsupported. The default unit-test
 suite does not require a compiler or run this check.
 
-The runner reads the current generated `TAIL` and fixed generic `LEXICON`. It
+The runner reads the current generated `TAIL`, generic `LEXICON` and character-position `MODEL`. It
 maps their bytes at two fake image bases and calls the actual x86 six-argument
-`nb_adjust` entry, with the seven-u32 profile used by the native bridges.
+`nb_adjust` entry, with the nine-u32 profile used by the native bridges.
 `harness.c`, `invoke.S` and `measure.S` contain only owned test code. The NBLX
 table is the project's credited generic word-frequency data; no story text,
 translation, game executable or personal data is used.

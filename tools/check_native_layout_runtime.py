@@ -18,6 +18,7 @@ import sys
 
 from native_layout_generated import TAIL, TAIL_SHA256
 from native_lexicon import LEXICON, LEXICON_SHA256, validate_lexicon
+from native_oov import MODEL, MODEL_SHA256, validate_model
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / 'tests' / 'native_layout_runtime'
@@ -51,6 +52,9 @@ def run(compiler: Path, output: Path):
     if hashlib.sha256(LEXICON).hexdigest() != LEXICON_SHA256:
         raise ValueError('Generated lexicon fingerprint differs')
     lexicon_info = validate_lexicon(LEXICON)
+    model_info = validate_model(MODEL)
+    if hashlib.sha256(MODEL).hexdigest() != MODEL_SHA256:
+        raise ValueError('Generated OOV model fingerprint differs')
     if not 0 < len(TAIL) < 0x100000 or not 0 < len(LEXICON) < 0x7fc000:
         raise ValueError('Payload exceeds the fake image regions')
     cases = _cases()
@@ -58,6 +62,7 @@ def run(compiler: Path, output: Path):
               'original_length,expected_cut,measure_fail_at,origin_x,cursor_x;} Case;\n')
     header += _array('payload', TAIL)
     header += f'extern const unsigned char lexicon[{len(LEXICON)}];\n'
+    header += f'extern const unsigned char model[{len(MODEL)}];\n'
     header += _array('closing', '，。！？；：、）】》」』～'.encode('gbk'))
     header += _array('opening', '（【《「『'.encode('gbk'))
     data = bytearray()
@@ -81,9 +86,11 @@ def run(compiler: Path, output: Path):
     output.mkdir(parents=True, exist_ok=False)
     (output / 'inputs.h').write_text(header, encoding='ascii')
     (output / 'lexicon-input.bin').write_bytes(LEXICON)
+    (output / 'model-input.bin').write_bytes(MODEL)
     # Relative incbin is resolved under cwd=output, including non-ASCII paths.
     (output / 'lexicon.S').write_text('.section .rdata,"dr"\n.globl _lexicon\n_lexicon:\n'
-                                    '.incbin "lexicon-input.bin"\n', encoding='ascii')
+                                    '.incbin "lexicon-input.bin"\n.globl _model\n_model:\n'
+                                    '.incbin "model-input.bin"\n', encoding='ascii')
     (output / 'cases.json').write_text(json.dumps(cases, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     exe = output / 'native_layout_harness.exe'
     command = [str(compiler), 'cc', '-target', 'x86-windows-gnu', '-Os', '-ffreestanding',
@@ -100,6 +107,7 @@ def run(compiler: Path, output: Path):
     report = dict(scope='Actual x86 TAIL execution with fake native metrics/classifiers; no game/GDI/UI',
         compiler_version='0.16.0', payload_sha256=TAIL_SHA256, payload_bytes=len(TAIL),
         lexicon={**lexicon_info, 'sha256': LEXICON_SHA256, 'bytes': len(LEXICON)},
+        oov_model={**model_info, 'sha256': MODEL_SHA256},
         cases_per_base=len(cases), bases=['0x18000000', '0x28000000'],
         expected_cut_assertions=sum('expected_cut' in case for case in cases),
         nonclosing_tail_assertions=sum(bool(case.get('forbid_closing_start')) for case in cases),

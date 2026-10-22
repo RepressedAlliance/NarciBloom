@@ -146,12 +146,16 @@ class NativeLayoutTests(unittest.TestCase):
                 self.assertEqual(new.sections[-1].Characteristics, 0x60000020)
                 lexicon_rva = int(report['labels']['lexicon'], 16)
                 profile_rva = int(report['labels']['profile'], 16)
-                fields = struct.unpack('<7I', new.get_data(profile_rva, 28))
+                fields = struct.unpack('<9I', new.get_data(profile_rva, 36))
                 self.assertEqual(fields[5], lexicon_rva)
                 self.assertEqual(new.get_data(lexicon_rva, 4), b'NBLX')
                 self.assertEqual(fields[6], struct.unpack('<I', new.get_data(lexicon_rva + 28, 4))[0])
                 self.assertEqual(hashlib.sha256(new.get_data(lexicon_rva, fields[6])).hexdigest(),
                                  report['lexicon']['sha256'])
+                self.assertEqual(fields[7], int(report['labels']['model'], 16))
+                self.assertEqual(new.get_data(fields[7], 4), b'NBHM')
+                self.assertEqual(hashlib.sha256(new.get_data(fields[7], fields[8])).hexdigest(),
+                                 report['oov_model']['sha256'])
                 self.assertEqual(result[0x205], 0x90)
                 self.assertEqual(result[len(original) - 23:len(original)], original[-23:])
                 self.assertEqual(new.get_data(0x4f000, 12), old.get_data(0x4f000, 12))

@@ -6,6 +6,8 @@ Adjustable text for the Steam edition of **Narcissu 10th Anniversary Anthology P
 
 See the [root-cause and validation notes](docs/LAYOUT.md) for the native failure, controlled comparisons and remaining limits. Generic word frequencies guide Chinese boundaries; original translation bytes are retained.
 
+The preview.7 candidate on main adds bounded recognition of words missing from the dictionary, with suffix-stable word costs and checks against common-singleton overmerging. Player packages are pending; the downloads below remain preview.6.
+
 - Six in-game sizes: **24 / 28 / 32 / 36 / 40 / 44**, with 36 as the default and an indicator for the current value.
 - Persistent size settings and an optional existing local font family; no font installation or system-locale change.
 - Readable native dialogs and menus, with Chinese captions for common controls in supported Chinese installations; some fixed prompts remain in English.

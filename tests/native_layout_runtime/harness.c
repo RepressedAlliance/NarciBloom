@@ -10,7 +10,7 @@ __declspec(dllimport) void __stdcall ExitProcess(u32);
 #include "inputs.h"
 extern void measure_stub(void);
 extern u32 invoke_adjust(PTR,u32,PTR,PTR,PTR,PTR,u32,u32*);
-typedef struct {u32 pending,measure,no_start,no_end,vertical,lexicon_rva,lexicon_bytes;} Profile;
+typedef struct {u32 pending,measure,no_start,no_end,vertical,lexicon_rva,lexicon_bytes,model_rva,model_bytes;} Profile;
 typedef u32 (*Adjust)(u32,const Profile*,PTR,u8*,u8*,u32);
 static u8 out_guard[1088],pending_guard[1088],out_before[1024],pending_before[1024];
 static u8 other[1024];
@@ -50,10 +50,11 @@ static void jump(u8*where,u32 destination){where[0]=0xb8;*(u32*)(where+1)=destin
 static void guards(u32 n){u32 i;for(i=0;i<32;i++)if(out_guard[i]!=0xc3||pending_guard[i]!=0xa7||out_guard[1056+i]!=0xc3||pending_guard[1056+i]!=0xa7)die(1000+n);}
 static void test_base(u32 address){
     u8 *image=VirtualAlloc((PTR)address,0x1000000,0x3000,0x40);u8 *out=out_guard+32,*pending=pending_guard+32;
-    Profile p={0x1000,0x2000,0x2100,0x2200,0x2300,0x4000,sizeof(lexicon)};
+    Profile p={0x1000,0x2000,0x2100,0x2200,0x2300,0x4000,sizeof(lexicon),0x4000+sizeof(lexicon),sizeof(model)};
     u32 n,i,a,b,result,total,original,flags;Adjust adjust;
     if((u32)image!=address)die(900);
     copy(image+0x800000,payload,sizeof(payload));copy(image+p.lexicon_rva,lexicon,sizeof(lexicon));
+    copy(image+p.model_rva,model,sizeof(model));
     jump(image+p.measure,(u32)measure_stub);jump(image+p.no_start,(u32)no_start);jump(image+p.no_end,(u32)no_end);
     adjust=(Adjust)(image+0x800000);
     for(n=0;n<sizeof(cases)/sizeof(cases[0]);++n){
