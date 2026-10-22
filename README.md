@@ -4,13 +4,11 @@
 
 《Narcissu 10th Anniversary Anthology Project》Steam 版的字号与排版改良项目，优先改善 Steam Deck 上的阅读体验。
 
-**当前版本：[v0.2.0-preview.6](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.6) · 开发预览。** 提供 Windows 与 SteamOS 玩家测试包，修复中文闭标点尾行，加入词语边界保护并统一取行与测宽，保留此前字号、空白与分页修正。尚未验证所有文本、演出和字号组合。
+**当前版本：[v0.2.0-preview.7](https://github.com/RepressedAlliance/NarciBloom/releases/tag/v0.2.0-preview.7) · 开发预览。** 提供 Windows 与 SteamOS 玩家测试包，补充“黯蓝”等词表未收录词的断行保护，保留已有字号、标点、空白与分页修正。尚未验证所有文本、演出和字号组合。
 
 [English](README.en.md) · [兼容性与测试范围](docs/COMPATIBILITY.md) · [开发与构建](docs/DEVELOPMENT.md) · [后续计划](docs/ROADMAP.md) · [更新记录](CHANGELOG.md)
 
-preview.6的原因、修正方法、对照结果与限制见[根因与验证](docs/LAYOUT.md)。词语保护依据通用词频，过宽词、歧义及特殊控制仍有边界，不修改原译文。
-
-main分支的preview.7候选已补充词表未收录词的识别，改善“黯蓝”等词语的断行；保留原译文与既有词边界，加入后续行边界稳定性和误粘连检查。玩家包尚待构建，当前下载仍为preview.6。
+preview.7的识别方法、原生对照结果与限制见[中文换行说明](docs/LAYOUT.md)。通用词频与成词位置数据共同指导词语保护，原译文不改；过宽词、歧义、漏识别及特殊控制仍有限制。
 
 ## 做了什么
 
@@ -40,8 +38,8 @@ main分支的preview.7候选已补充词表未收录词的识别，改善“黯�
 
 | 包名 | 用途 | Windows | SteamOS / Steam Deck |
 |---|---|---|---|
-| **Fonts** · 独立字体补丁 | 保留当前日文、英文或受支持中文；不含汉化，无需先安装汉化。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.6/NarciBloom-0.2.0-preview.6-Windows-x64-Fonts.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.6/NarciBloom-0.2.0-preview.6-SteamOS-Linux-x64-Fonts.zip) |
-| **Chinese** · 中文整合包 | 风铃 PC v1.1 安装材料、原署名与相同字体功能；无需先运行原汉化程序。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.6/NarciBloom-0.2.0-preview.6-Windows-x64-Chinese.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.6/NarciBloom-0.2.0-preview.6-SteamOS-Linux-x64-Chinese.zip) |
+| **Fonts** · 独立字体补丁 | 保留当前日文、英文或受支持中文；不含汉化，无需先安装汉化。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.7/NarciBloom-0.2.0-preview.7-Windows-x64-Fonts.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.7/NarciBloom-0.2.0-preview.7-SteamOS-Linux-x64-Fonts.zip) |
+| **Chinese** · 中文整合包 | 风铃 PC v1.1 安装材料、原署名与相同字体功能；无需先运行原汉化程序。 | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.7/NarciBloom-0.2.0-preview.7-Windows-x64-Chinese.zip) | [下载 ZIP](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.7/NarciBloom-0.2.0-preview.7-SteamOS-Linux-x64-Chinese.zip) |
 
 Windows 提供完整解压后运行的 `.exe`；SteamOS 提供原生可执行程序，安装器无需 Proton。两种包都需要自有 Steam 游戏。中文原包的转载条件、署名与本地生成方式见[汉化来源说明](docs/TRANSLATION.md)。
 
@@ -49,13 +47,13 @@ Windows 提供完整解压后运行的 `.exe`；SteamOS 提供原生可执行程
 
 下载上表对应 ZIP，**关闭游戏并完整解压**，运行 `NarciBloom.exe`／`NarciBloomChinese.exe`（Windows），或在桌面模式运行 `NarciBloom`／`NarciBloomChinese`（SteamOS）。检查游戏根目录、选择故事，点击「安装 / 更新」，完成后从 Steam 启动游戏。
 
-旧版用户也通过新版安装器更新，保留游戏内的 `.narcibloom` 原文件备份；不要手动覆盖汉化或删除记录。遇到未知版本或文件冲突会停止并显示原因。完整步骤与恢复方法见[安装说明](docs/INSTALLATION.md)，文件校验值见发布页的 [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.6/SHA256SUMS.txt)。
+旧版用户也通过新版安装器更新，保留游戏内的 `.narcibloom` 原文件备份；不要手动覆盖汉化或删除记录。遇到未知版本或文件冲突会停止并显示原因。完整步骤与恢复方法见[安装说明](docs/INSTALLATION.md)，文件校验值见发布页的 [SHA256SUMS.txt](https://github.com/RepressedAlliance/NarciBloom/releases/download/v0.2.0-preview.7/SHA256SUMS.txt)。
 
 源码仓库不包含游戏本体、剧情文本、语音、CG、汉化原文件或玩家存档。开发者请阅读[构建说明](docs/DEVELOPMENT.md)。
 
 ## 验证范围与限制
 
-preview.6共200项源码检查，本地196项通过、4项平台跳过；两平台CI构建及冻结安装器两种视图启动检查通过。实际x86修正执行624次中性用例；两条玩家报告原文在20种受控字宽／行宽组合中对照，旧版2处纯标点坏切和5处目标词拆开在新候选中均为0，文字字节全部保全。五部中文构建及十组日英构建证据保留。新版尚未做Deck游戏画面回归，不能据此认定全部字号、字体、专名或全篇通过；此前版本实机证据单独记录，见[兼容性说明](docs/COMPATIBILITY.md)。
+preview.7本地207项源码检查中203项通过、4项平台跳过；两平台构建及冻结安装器两种视图启动检查通过。原生x86执行638次中性用例，五个载荷完成92项桥接检查。三条反馈文本的90组受控条件/版本对照中，指定目标词拆分4→0，闭标点坏切均为0，文字字节保全。已完成Deck后台更新的文件核验，尚未进行新版游戏画面、动画或存读档回归；不等于所有词、实际字体和全篇通过。详见[兼容性说明](docs/COMPATIBILITY.md)。
 
 新增页内等待时，设置和历史暂不可用；到原生段落停顿后恢复。页内存档不能精确恢复到该页，可能需要重读当前段。旧存档缓存不会自动重写，所有剧情／字体／字号组合及 SteamOS 完整自动播放周期等尚未验证；本轮 SteamOS 的 Space 停止自动播放尝试未通过。当前适合玩家试用与反馈，不作全篇无故障保证。
 
